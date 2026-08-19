@@ -1,0 +1,18 @@
+{
+  "name": "importador-cnpj-receita",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Importador dos Dados Abertos do CNPJ da Receita Federal para MySQL 8 remoto",
+  "type": "module",
+  "scripts": {
+    "importar": "node src/import.js",
+    "testar-conexao": "node src/test-connection.js"
+  },
+  "engines": {"node": ">=20"},
+  "dependencies": {
+    "csv-parse": "^5.6.0",
+    "dotenv": "^16.4.5",
+    "mysql2": "^3.11.3",
+    "yauzl": "^3.1.3"
+  }
+}
