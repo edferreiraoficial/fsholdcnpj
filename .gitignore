@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 node_modules/
 dist/
 build/
@@ -19,3 +20,8 @@ npm-debug.log*
 .cache/
 
 temp/
+=======
+.env
+node_modules/
+*.log
+>>>>>>> 26990be254c4b2667a6bd42482c37928df473520

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # CRM CNPJ — Consulta + Importação
 
 Aplicação local para Windows que consulta o CRM CNPJ na Hostinger e controla a importação filtrada dos ZIPs da Receita Federal.
@@ -71,3 +72,59 @@ O botão **Importar para Hostinger** dispara o importador no próprio backend lo
 ## Segurança
 
 O arquivo `.env` contém a senha do banco e não deve ser enviado ao GitHub.
+=======
+# Importador CNPJ Receita Federal -> MySQL 8 remoto
+
+## Instalação no Windows 10
+
+1. Extraia este projeto, por exemplo em `C:\cnpj-importador`.
+2. Abra o PowerShell na pasta.
+3. Rode:
+
+```powershell
+npm install
+Copy-Item .env.example .env
+```
+
+4. Edite `.env` com os dados do MySQL da Hostinger e a pasta dos ZIPs.
+5. Teste:
+
+```powershell
+npm run testar-conexao
+```
+
+6. Primeira importação completa:
+
+```powershell
+npm run importar -- --limpar
+```
+
+Digite `SIM` quando solicitado.
+
+## Pasta dos ZIPs
+
+Coloque os arquivos oficiais sem extrair, por exemplo:
+
+```text
+C:\ReceitaCNPJ\
+  Empresas0.zip
+  Empresas1.zip
+  Estabelecimentos0.zip
+  Socios0.zip
+  Simples.zip
+  Cnaes.zip
+  Municipios.zip
+  Motivos.zip
+  Naturezas.zip
+  Paises.zip
+  Qualificacoes.zip
+```
+
+## Observações
+
+- O importador lê os ZIPs diretamente.
+- Os dados são enviados ao MySQL em lotes, evitando depender de `LOAD DATA LOCAL INFILE`.
+- Comece com `BATCH_SIZE=1000`.
+- Se ocorrer erro de pacote grande, use 500.
+- Não publique o arquivo `.env` no GitHub.
+>>>>>>> 26990be254c4b2667a6bd42482c37928df473520
