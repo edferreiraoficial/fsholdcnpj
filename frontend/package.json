@@ -1,16 +1,26 @@
 {
+<<<<<<< HEAD
   "name": "fshold-cnpj-frontend",
   "version": "2.0.0",
+=======
+  "name": "crm-cnpj-frontend",
+  "version": "1.0.0",
+>>>>>>> 3e7226b891f18b3e217e275d808991e33931895b
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
+<<<<<<< HEAD
     "build": "tsc -b && vite build",
     "preview": "vite preview"
+=======
+    "build": "tsc -b && vite build"
+>>>>>>> 3e7226b891f18b3e217e275d808991e33931895b
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
+<<<<<<< HEAD
     "@mui/icons-material": "^5.16.14",
     "@mui/material": "^5.16.14",
     "axios": "^1.7.9",
@@ -20,8 +30,23 @@
   "devDependencies": {
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
+=======
+    "@mui/icons-material": "^6.4.1",
+    "@mui/material": "^6.4.1",
+    "axios": "^1.7.9",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.3",
+    "@types/react-dom": "^19.0.2",
+>>>>>>> 3e7226b891f18b3e217e275d808991e33931895b
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.7.3",
     "vite": "^6.0.7"
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 3e7226b891f18b3e217e275d808991e33931895b
