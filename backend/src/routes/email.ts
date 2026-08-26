@@ -6,6 +6,7 @@ import { pool } from '../lib/db.js';
 
 const filterSchema = z.object({
   q:z.string().optional(),
+  email:z.string().optional(),
   uf:z.string().optional(),
   municipio:z.string().optional(),
   situacao:z.string().optional(),
@@ -30,6 +31,7 @@ function buildWhere(f: Filters) {
   const where = [
     "COALESCE(v.email,'')<>''",
     'COALESCE(pc.nao_contatar,0)=0',
+    'COALESCE(pc.status_tempo_real,pc.status_id,v.status_id,0)<>10',
     'eo.email IS NULL'
   ];
   const params:any[] = [];
@@ -51,6 +53,8 @@ function buildWhere(f: Filters) {
     params.push(like,like,like,like);
   }
 
+  if(f.email) add('LOWER(v.email) LIKE LOWER(?)',`%${f.email}%`);
+
   if(f.uf) add('v.uf=?',f.uf);
   if(f.municipio) add('UPPER(v.municipio)=UPPER(?)',f.municipio);
   if(f.situacao) add('v.situacao_cadastral=?',f.situacao);
@@ -70,7 +74,7 @@ function buildWhere(f: Filters) {
   if(f.porte) add('v.porte=?',f.porte);
   if(f.simples) add('v.simples=?',f.simples);
   if(f.mei) add('v.mei=?',f.mei);
-  if(f.status) add('v.status_id=?',f.status);
+  if(f.status) add('COALESCE(pc.status_tempo_real,pc.status_id,v.status_id)=?',f.status);
   if(f.prioridade) add('v.prioridade=?',f.prioridade);
 
   if(f.temTelefone==='S') where.push(`COALESCE(v.telefone1,'')<>''`);
@@ -1060,121 +1064,142 @@ export async function emailRoutes(app:FastifyInstance){
     return {ok:true};
   });
 
-  app.post('/email-campaigns/:id/process', async req=>{
-    const id=Number((req.params as any).id);
-    const body=(req.body as any)||{};
+  const campaignJobs=new Set<number>();
+
+  async function processCampaignInBackground(id:number, body:any){
     const limit=Math.min(5000,Math.max(1,Number(body.limit||process.env.EMAIL_BATCH_SIZE||500)));
     const rodizio=body.rodizio!==false;
     const intervaloGlobalSegundos=Math.min(300,Math.max(0,Number(body.intervaloGlobalSegundos??2)));
     const intervaloRemetenteSegundos=Math.min(3600,Math.max(1,Number(body.intervaloRemetenteSegundos??10)));
     const aguardar=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
 
-    const [campRows]=await pool.query('SELECT * FROM email_campanhas WHERE id=?',[id]);
-    const camp=(campRows as any[])[0];
-    if(!camp) return {ok:false,message:'Campanha não encontrada'};
-    if(camp.status==='CANCELADA') return {ok:false,message:'Campanha cancelada.'};
-
-    await pool.query(`UPDATE email_campanhas SET status='ENVIANDO',iniciado_em=COALESCE(iniciado_em,NOW()) WHERE id=?`,[id]);
-    const [rows]=await pool.query(`
-      SELECT d.id,d.prospect_id,d.email,v.razao_social,v.nome_fantasia,v.cnpj,v.municipio,v.uf,
-             v.situacao_cadastral,e.data_situacao
-      FROM email_campanha_destinatarios d
-      JOIN vw_prospects_completos v ON v.prospect_id=d.prospect_id
-      JOIN prospects p ON p.id=d.prospect_id
-      JOIN estabelecimentos e ON e.id=p.estabelecimento_id
-      LEFT JOIN prospect_crm pc ON pc.prospect_id=d.prospect_id
-      LEFT JOIN email_optout eo ON LOWER(eo.email)=LOWER(d.email)
-      WHERE d.campanha_id=? AND d.status='PENDENTE' AND COALESCE(pc.nao_contatar,0)=0 AND eo.email IS NULL
-      ORDER BY d.id LIMIT ?
-    `,[id,limit]);
-
-    let remetentes:RemetenteConfig[]=[];
-    if(rodizio){
-      let senderRows:any[]=[];
-      const grupoId=Number(body.grupoRemetenteId||camp.grupo_remetente_id||0);
-      if(grupoId){
-        await pool.query('UPDATE email_campanhas SET grupo_remetente_id=? WHERE id=?',[grupoId,id]);
-        const [result]=await pool.query(`SELECT r.* FROM email_remetente_grupo_itens gi JOIN email_remetentes r ON r.id=gi.remetente_id WHERE gi.grupo_id=? AND r.ativo=1 ORDER BY gi.ordem,r.id`,[grupoId]);
-        senderRows=result as any[];
-      }else{
-        const [result]=await pool.query(`SELECT * FROM email_remetentes WHERE ativo=1 AND rodizio=1 ORDER BY padrao DESC,id`);
-        senderRows=result as any[];
-      }
-      for(const r of senderRows as any[]){
-        remetentes.push({id:Number(r.id),nome:String(r.nome||''),email:String(r.email||r.smtp_user||''),smtp_host:String(r.smtp_host||'smtp.gmail.com'),smtp_port:Number(r.smtp_port||587),smtp_secure:Boolean(r.smtp_secure),smtp_user:String(r.smtp_user||''),smtp_password:String(r.smtp_password||''),from_name:String(r.from_name||r.nome||'FSHold')});
-      }
-      if(!remetentes.length) return {ok:false,message:'O grupo selecionado não possui remetentes ativos.'};
-    }else{
-      if(body.remetenteId){
-        const novoId=Number(body.remetenteId);
-        const [valid]=await pool.query('SELECT id FROM email_remetentes WHERE id=? AND ativo=1 LIMIT 1',[novoId]);
-        if(!(valid as any[]).length) return {ok:false,message:'Remetente selecionado não encontrado ou inativo.'};
-        await pool.query('UPDATE email_campanhas SET remetente_id=? WHERE id=?',[novoId,id]);
-        camp.remetente_id=novoId;
-      }
-      remetentes=[await remetenteConfig(camp.remetente_id ? Number(camp.remetente_id) : null)];
-    }
-
-    const transportes=new Map<number|string,any>();
-    const ultimoUso=new Map<number|string,number>();
-    const bloqueados=new Set<number|string>();
-    const chave=(r:RemetenteConfig)=>r.id??r.email;
-    const tx=(r:RemetenteConfig)=>{const k=chave(r);if(!transportes.has(k)) transportes.set(k,transporter(r));return transportes.get(k);};
-    let cursor=0,ok=0,fail=0;
+    let ok=0,fail=0;
     const usados:Record<string,number>={};
+    try{
+      const [campRows]=await pool.query('SELECT * FROM email_campanhas WHERE id=?',[id]);
+      const camp=(campRows as any[])[0];
+      if(!camp || camp.status==='CANCELADA') return;
 
-    for(let i=0;i<(rows as any[]).length;i++){
-      const r=(rows as any[])[i];
-      let enviado=false;
-      while(!enviado){
-        const disponiveis=remetentes.filter(x=>!bloqueados.has(chave(x)));
-        if(!disponiveis.length){
-          await pool.query(`UPDATE email_campanhas SET status='PRONTA',enviados=enviados+?,falhas=falhas+? WHERE id=?`,[ok,fail,id]);
-          const [leftNow]=await pool.query(`SELECT COUNT(*) pendentes FROM email_campanha_destinatarios WHERE campanha_id=? AND status='PENDENTE'`,[id]);
-          return {ok:true,enviadosLote:ok,falhasLote:fail,pendentes:Number((leftNow as any[])[0].pendentes),interrompido:true,limiteAtingido:true,rodizio:true,usados,message:'Todos os remetentes disponíveis no rodízio atingiram limite ou ficaram indisponíveis. A campanha foi pausada e os restantes continuam pendentes.'};
+      await pool.query(`UPDATE email_campanhas SET status='ENVIANDO',lote_status='PROCESSANDO',lote_total=?,lote_processados=0,lote_enviados=0,lote_falhas=0,lote_mensagem='Lote iniciado',lote_atualizado_em=NOW(),iniciado_em=COALESCE(iniciado_em,NOW()) WHERE id=?`,[limit,id]);
+      const [rows]=await pool.query(`
+        SELECT d.id,d.prospect_id,d.email,v.razao_social,v.nome_fantasia,v.cnpj,v.municipio,v.uf,
+               v.situacao_cadastral,e.data_situacao
+        FROM email_campanha_destinatarios d
+        JOIN vw_prospects_completos v ON v.prospect_id=d.prospect_id
+        JOIN prospects p ON p.id=d.prospect_id
+        JOIN estabelecimentos e ON e.id=p.estabelecimento_id
+        LEFT JOIN prospect_crm pc ON pc.prospect_id=d.prospect_id
+        LEFT JOIN email_optout eo ON LOWER(eo.email)=LOWER(d.email)
+        WHERE d.campanha_id=? AND d.status='PENDENTE'
+          AND COALESCE(pc.nao_contatar,0)=0
+          AND COALESCE(pc.status_tempo_real,pc.status_id,v.status_id,0)<>10
+          AND eo.email IS NULL
+        ORDER BY d.id LIMIT ?
+      `,[id,limit]);
+
+      await pool.query(`UPDATE email_campanhas SET lote_total=? WHERE id=?`,[(rows as any[]).length,id]);
+
+      let remetentes:RemetenteConfig[]=[];
+      if(rodizio){
+        let senderRows:any[]=[];
+        const grupoId=Number(body.grupoRemetenteId||camp.grupo_remetente_id||0);
+        if(grupoId){
+          await pool.query('UPDATE email_campanhas SET grupo_remetente_id=? WHERE id=?',[grupoId,id]);
+          const [result]=await pool.query(`SELECT r.* FROM email_remetente_grupo_itens gi JOIN email_remetentes r ON r.id=gi.remetente_id WHERE gi.grupo_id=? AND r.ativo=1 ORDER BY gi.ordem,r.id`,[grupoId]);
+          senderRows=result as any[];
+        }else{
+          const [result]=await pool.query(`SELECT * FROM email_remetentes WHERE ativo=1 AND rodizio=1 ORDER BY padrao DESC,id`);
+          senderRows=result as any[];
         }
-
-        // Procura, em ordem circular, a próxima conta já liberada pelo intervalo individual.
-        let escolhido:RemetenteConfig|null=null;
-        let menorEspera=Infinity;
-        for(let n=0;n<disponiveis.length;n++){
-          const cand=disponiveis[(cursor+n)%disponiveis.length];
-          const espera=Math.max(0,(ultimoUso.get(chave(cand))||0)+intervaloRemetenteSegundos*1000-Date.now());
-          if(espera<=0){escolhido=cand;cursor=(cursor+n+1)%Math.max(1,disponiveis.length);break;}
-          menorEspera=Math.min(menorEspera,espera);
+        for(const r of senderRows){
+          remetentes.push({id:Number(r.id),nome:String(r.nome||''),email:String(r.email||r.smtp_user||''),smtp_host:String(r.smtp_host||'smtp.gmail.com'),smtp_port:Number(r.smtp_port||587),smtp_secure:Boolean(r.smtp_secure),smtp_user:String(r.smtp_user||''),smtp_password:String(r.smtp_password||''),from_name:String(r.from_name||r.nome||'FSHold')});
         }
-        if(!escolhido){await aguardar(Math.max(50,menorEspera));continue;}
+        if(!remetentes.length) throw new Error('O grupo selecionado não possui remetentes ativos.');
+      }else{
+        remetentes=[await remetenteConfig(camp.remetente_id ? Number(camp.remetente_id) : null)];
+      }
 
-        try{
-          await tx(escolhido).sendMail({from:fromAddress(escolhido),to:r.email,subject:renderTemplate(camp.assunto,r),html:renderTemplate(camp.corpo_html,r)});
-          ultimoUso.set(chave(escolhido),Date.now());
-          usados[escolhido.email]=(usados[escolhido.email]||0)+1;
-          await pool.query(`UPDATE email_campanha_destinatarios SET status='ENVIADO',tentativas=tentativas+1,enviado_em=NOW(),erro=NULL,remetente_id=? WHERE id=?`,[escolhido.id,r.id]);
-          await pool.query(`INSERT INTO prospect_contatos (prospect_id,tipo,telefone_email,resultado,observacoes) VALUES (?,'EMAIL',?,'ENVIADO',?)`,[r.prospect_id,r.email,`Campanha #${id}: ${camp.nome} | Remetente: ${escolhido.email}`]);
-          await registrarUsoRemetente(escolhido,null);
-          ok++;enviado=true;
-          if(i<(rows as any[]).length-1 && intervaloGlobalSegundos>0) await aguardar(intervaloGlobalSegundos*1000);
-        }catch(e:any){
-          const erro=String(e?.message||e).slice(0,2000);
-          if(erroLimiteDiario(e)){
-            bloqueados.add(chave(escolhido));
-            await registrarUsoRemetente(escolhido,erro);
-            await pool.query(`UPDATE email_campanha_destinatarios SET tentativas=tentativas+1,erro=? WHERE id=?`,[`LIMITE_DIARIO_REMETENTE ${escolhido.email}: ${erro}`,r.id]);
-            continue; // mesmo destinatário será tentado pela próxima conta disponível
+      const transportes=new Map<number|string,any>();
+      const ultimoUso=new Map<number|string,number>();
+      const bloqueados=new Set<number|string>();
+      const chave=(r:RemetenteConfig)=>r.id??r.email;
+      const tx=(r:RemetenteConfig)=>{const k=chave(r);if(!transportes.has(k)) transportes.set(k,transporter(r));return transportes.get(k);};
+      let cursor=0;
+
+      for(let i=0;i<(rows as any[]).length;i++){
+        const r=(rows as any[])[i];
+        let finalizado=false;
+        while(!finalizado){
+          const disponiveis=remetentes.filter(x=>!bloqueados.has(chave(x)));
+          if(!disponiveis.length){
+            await pool.query(`UPDATE email_campanhas SET status='PRONTA',lote_status='PAUSADO',lote_mensagem=?,lote_atualizado_em=NOW() WHERE id=?`,['Todos os remetentes do grupo ficaram indisponíveis. Os restantes continuam pendentes.',id]);
+            return;
           }
-          await pool.query(`UPDATE email_campanha_destinatarios SET status='FALHOU',tentativas=tentativas+1,erro=?,remetente_id=? WHERE id=?`,[erro,escolhido.id,r.id]);
-          fail++;enviado=true;
+          let escolhido:RemetenteConfig|null=null;
+          let menorEspera=Infinity;
+          for(let n=0;n<disponiveis.length;n++){
+            const cand=disponiveis[(cursor+n)%disponiveis.length];
+            const espera=Math.max(0,(ultimoUso.get(chave(cand))||0)+intervaloRemetenteSegundos*1000-Date.now());
+            if(espera<=0){escolhido=cand;cursor=(cursor+n+1)%Math.max(1,disponiveis.length);break;}
+            menorEspera=Math.min(menorEspera,espera);
+          }
+          if(!escolhido){await aguardar(Math.max(50,menorEspera));continue;}
+          try{
+            await tx(escolhido).sendMail({from:fromAddress(escolhido),to:r.email,subject:renderTemplate(camp.assunto,r),html:renderTemplate(camp.corpo_html,r)});
+            ultimoUso.set(chave(escolhido),Date.now());
+            usados[escolhido.email]=(usados[escolhido.email]||0)+1;
+            await pool.query(`UPDATE email_campanha_destinatarios SET status='ENVIADO',tentativas=tentativas+1,enviado_em=NOW(),erro=NULL,remetente_id=? WHERE id=?`,[escolhido.id,r.id]);
+            await pool.query(`INSERT INTO prospect_contatos (prospect_id,tipo,telefone_email,resultado,observacoes) VALUES (?,'EMAIL',?,'ENVIADO',?)`,[r.prospect_id,r.email,`Campanha #${id}: ${camp.nome} | Remetente: ${escolhido.email}`]);
+            await registrarUsoRemetente(escolhido,null);
+            ok++;finalizado=true;
+          }catch(e:any){
+            const erro=String(e?.message||e).slice(0,2000);
+            if(erroLimiteDiario(e)){
+              bloqueados.add(chave(escolhido));
+              await registrarUsoRemetente(escolhido,erro);
+              await pool.query(`UPDATE email_campanha_destinatarios SET tentativas=tentativas+1,erro=? WHERE id=?`,[`LIMITE_DIARIO_REMETENTE ${escolhido.email}: ${erro}`,r.id]);
+              continue;
+            }
+            await pool.query(`UPDATE email_campanha_destinatarios SET status='FALHOU',tentativas=tentativas+1,erro=?,remetente_id=? WHERE id=?`,[erro,escolhido.id,r.id]);
+            fail++;finalizado=true;
+          }
+          await pool.query(`UPDATE email_campanhas SET lote_processados=?,lote_enviados=?,lote_falhas=?,lote_mensagem=?,lote_atualizado_em=NOW() WHERE id=?`,[ok+fail,ok,fail,`Processados ${ok+fail} de ${(rows as any[]).length}`,id]);
           if(i<(rows as any[]).length-1 && intervaloGlobalSegundos>0) await aguardar(intervaloGlobalSegundos*1000);
         }
       }
-    }
 
-    await pool.query(`UPDATE email_campanhas SET enviados=enviados+?,falhas=falhas+? WHERE id=?`,[ok,fail,id]);
-    const [leftRows]=await pool.query(`SELECT COUNT(*) pendentes FROM email_campanha_destinatarios WHERE campanha_id=? AND status='PENDENTE'`,[id]);
-    const pending=Number((leftRows as any[])[0].pendentes);
-    if(pending===0) await pool.query(`UPDATE email_campanhas SET status='CONCLUIDA',finalizado_em=NOW() WHERE id=?`,[id]);
-    else await pool.query(`UPDATE email_campanhas SET status='PRONTA' WHERE id=?`,[id]);
-    return {ok:true,enviadosLote:ok,falhasLote:fail,pendentes:pending,rodizio,intervaloGlobalSegundos,intervaloRemetenteSegundos,usados};
+      await pool.query(`UPDATE email_campanhas SET enviados=enviados+?,falhas=falhas+? WHERE id=?`,[ok,fail,id]);
+      const [leftRows]=await pool.query(`SELECT COUNT(*) pendentes FROM email_campanha_destinatarios WHERE campanha_id=? AND status='PENDENTE'`,[id]);
+      const pending=Number((leftRows as any[])[0].pendentes);
+      if(pending===0) await pool.query(`UPDATE email_campanhas SET status='CONCLUIDA',lote_status='CONCLUIDO',lote_mensagem='Lote concluído',lote_atualizado_em=NOW(),finalizado_em=NOW() WHERE id=?`,[id]);
+      else await pool.query(`UPDATE email_campanhas SET status='PRONTA',lote_status='CONCLUIDO',lote_mensagem=?,lote_atualizado_em=NOW() WHERE id=?`,[`Lote concluído. ${pending} destinatário(s) continuam pendentes.`,id]);
+    }catch(e:any){
+      await pool.query(`UPDATE email_campanhas SET status='PRONTA',lote_status='ERRO',lote_mensagem=?,lote_atualizado_em=NOW() WHERE id=?`,[String(e?.message||e).slice(0,500),id]).catch(()=>{});
+    }finally{
+      campaignJobs.delete(id);
+    }
+  }
+
+  app.post('/email-campaigns/:id/process', async (req,reply)=>{
+    const id=Number((req.params as any).id);
+    const body=(req.body as any)||{};
+    const [campRows]=await pool.query('SELECT id,status,lote_status FROM email_campanhas WHERE id=?',[id]);
+    const camp=(campRows as any[])[0];
+    if(!camp) return reply.code(404).send({ok:false,message:'Campanha não encontrada'});
+    if(camp.status==='CANCELADA') return reply.code(400).send({ok:false,message:'Campanha cancelada.'});
+    if(campaignJobs.has(id)) return {ok:true,accepted:true,alreadyRunning:true,message:'A campanha já está sendo processada.'};
+    campaignJobs.add(id);
+    void processCampaignInBackground(id,body);
+    return reply.code(202).send({ok:true,accepted:true,message:'Lote iniciado em segundo plano. Acompanhe o progresso na tela.'});
+  });
+
+  app.get('/email-campaigns/:id/progress', async req=>{
+    const id=Number((req.params as any).id);
+    const [rows]=await pool.query(`SELECT id,status,lote_status,lote_total,lote_processados,lote_enviados,lote_falhas,lote_mensagem,lote_atualizado_em FROM email_campanhas WHERE id=?`,[id]);
+    const c=(rows as any[])[0];
+    if(!c) return {ok:false,message:'Campanha não encontrada'};
+    const [statsRows]=await pool.query(`SELECT COUNT(*) total,SUM(status='PENDENTE') pendentes,SUM(status='ENVIADO') enviados,SUM(status='FALHOU') falhas FROM email_campanha_destinatarios WHERE campanha_id=?`,[id]);
+    return {ok:true,...c,stats:(statsRows as any[])[0],running:campaignJobs.has(id)};
   });
 
   app.post('/email-campaigns/:id/cancel', async req=>{

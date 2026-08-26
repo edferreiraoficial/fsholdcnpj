@@ -64,6 +64,8 @@ type Modelo = {
 
 export default function EmailCampaignPage(){
   const [tab,setTab]=useState(0);
+  const [composeTab,setComposeTab]=useState(0);
+  const [progressoLote,setProgressoLote]=useState<any>(null);
   const [filters,setFilters]=useState<any>({});
 
   const [total,setTotal]=useState(0);
@@ -360,49 +362,41 @@ export default function EmailCampaignPage(){
     }catch(e:any){setErro(e?.response?.data?.message||e.message);}
   };
 
+  const atualizarProgresso=async(id=campanhaId)=>{
+    if(!id) return;
+    try{
+      const {data}=await api.get(`/email-campaigns/${id}/progress`);
+      if(data?.ok===false) return;
+      setProgressoLote(data);
+      const stats=data.stats||{};
+      setPendentes(Number(stats.pendentes||0));
+      setEnviados(Number(stats.enviados||0));
+      setFalhas(Number(stats.falhas||0));
+      await carregarPendentesCampanha(id);
+      if(data.lote_status==='CONCLUIDO'){setSending(false);setSucesso(data.lote_mensagem||'Lote concluído.');await carregarHistorico();}
+      if(data.lote_status==='PAUSADO'||data.lote_status==='ERRO'){setSending(false);setErro(data.lote_mensagem||'O lote foi interrompido.');await carregarHistorico();}
+    }catch{}
+  };
+
+  useEffect(()=>{
+    if(!campanhaId || !sending) return;
+    const tick=()=>atualizarProgresso(campanhaId);
+    tick();
+    const id=setInterval(tick,2500);
+    return()=>clearInterval(id);
+  },[campanhaId,sending]);
+
   const enviarQuantidade=async()=>{
     if(!campanhaId) return;
-
     const quantidade=Math.max(1,Math.min(5000,Number(quantidadeEnvio)||500));
     setQuantidadeEnvio(quantidade);
-    setSending(true);
-    setErro('');
-    setSucesso('');
-
+    setSending(true);setErro('');setSucesso('');
     try{
-      const {data}=await api.post(
-        `/email-campaigns/${campanhaId}/process`,
-        {limit:quantidade, grupoRemetenteId:grupoRemetenteId||undefined, remetenteId:remetenteId||undefined, rodizio:true, intervaloGlobalSegundos, intervaloRemetenteSegundos}
-      );
-
-      if(data.ok===false){
-        throw new Error(data.message||'Falha ao processar campanha.');
-      }
-
-      const left=Number(data.pendentes||0);
-      const enviadosLote=Number(data.enviadosLote||0);
-      const falhasLote=Number(data.falhasLote||0);
-
-      setPendentes(left);
-      setEnviados(v=>v+enviadosLote);
-      setFalhas(v=>v+falhasLote);
-
-      if(data.interrompido||data.limiteAtingido){
-        setErro(data.message||'O envio foi pausado pelo provedor de e-mail. Troque o remetente e continue os pendentes.');
-      }else if(left===0){
-        setSucesso(`Envio concluído. ${enviadosLote.toLocaleString('pt-BR')} e-mail(s) enviado(s) neste lote e não há mais pendentes.`);
-      }else{
-        const dist=data.usados?Object.entries(data.usados).map(([email,qtd])=>`${email}: ${qtd}`).join(' · '):'';
-        setSucesso(`${enviadosLote.toLocaleString('pt-BR')} e-mail(s) enviado(s) neste lote. Restam ${left.toLocaleString('pt-BR')} pendente(s).${dist?' Distribuição: '+dist:''}`);
-      }
-
-      carregarHistorico();
-      carregarPendentesCampanha(campanhaId);
-    }catch(e:any){
-      setErro(e?.response?.data?.message||e.message);
-    }finally{
-      setSending(false);
-    }
+      const {data}=await api.post(`/email-campaigns/${campanhaId}/process`,{limit:quantidade,grupoRemetenteId:grupoRemetenteId||undefined,remetenteId:remetenteId||undefined,rodizio:true,intervaloGlobalSegundos,intervaloRemetenteSegundos},{timeout:15000});
+      if(data.ok===false) throw new Error(data.message||'Falha ao iniciar campanha.');
+      setSucesso(data.message||'Lote iniciado em segundo plano. Você pode permanecer na tela acompanhando o progresso.');
+      await atualizarProgresso(campanhaId);
+    }catch(e:any){setSending(false);setErro(e?.response?.data?.message||e.message);}
   };
 
   const salvarNovoModelo=async()=>{
@@ -651,6 +645,7 @@ export default function EmailCampaignPage(){
 
     {erro&&<Alert severity="error">{erro}</Alert>}
     {sucesso&&<Alert severity="success">{sucesso}</Alert>}
+    {progressoLote&&campanhaId&&<Paper variant="outlined" sx={{p:1.2}}><Stack spacing={.7}><Stack direction="row" spacing={1} alignItems="center"><Typography fontWeight={700}>Envio em tempo real</Typography><Chip label={progressoLote.lote_status||'PARADO'} variant="outlined"/><Typography variant="caption">{progressoLote.lote_mensagem||''}</Typography></Stack><LinearProgress variant="determinate" value={Number(progressoLote.lote_total||0)?Math.min(100,Number(progressoLote.lote_processados||0)*100/Number(progressoLote.lote_total||1)):0}/><Typography variant="caption">Lote: {Number(progressoLote.lote_processados||0)}/{Number(progressoLote.lote_total||0)} · enviados {Number(progressoLote.lote_enviados||0)} · falhas {Number(progressoLote.lote_falhas||0)} · pendentes gerais {Number(progressoLote.stats?.pendentes||0)}</Typography></Stack></Paper>}
 
     <Paper variant="outlined">
       <Tabs value={tab} onChange={(_,v)=>setTab(v)}>
@@ -662,6 +657,7 @@ export default function EmailCampaignPage(){
     </Paper>
 
     {tab===0 && <Stack spacing={2}>
+      <Paper variant="outlined"><Tabs value={composeTab} onChange={(_,v)=>setComposeTab(v)}><Tab label="Destinatários"/><Tab label="Mensagem e envio"/></Tabs></Paper>
       <Paper variant="outlined" sx={{p:3}}>
         <Stack spacing={2}>
           <Stack
@@ -788,6 +784,7 @@ export default function EmailCampaignPage(){
             </Button>
           )}
 
+          {composeTab===0 && <>
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -827,6 +824,8 @@ export default function EmailCampaignPage(){
             </TableBody>
           </Table>
 
+          </>}
+          {composeTab===1 && <>
           <Divider/>
 
           <Alert severity="info">
@@ -934,6 +933,10 @@ export default function EmailCampaignPage(){
                 {' {{data_situacao}}'},
                 {' {{whatsapp}}'}.
               </Typography>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Paper variant="outlined" sx={{p:1.5,minHeight:160}}><Typography fontWeight={700} sx={{mb:1}}>Visualização do e-mail</Typography><Typography variant="subtitle2" fontWeight={700}>{assunto||'(sem assunto)'}</Typography><Box sx={{mt:1,fontSize:12,'& p':{my:.6}}} dangerouslySetInnerHTML={{__html:corpoHtml||'<p>Selecione ou edite um modelo para visualizar.</p>'}}/></Paper>
             </Grid>
 
             <Grid item xs={12} md={8}>
@@ -1046,6 +1049,7 @@ export default function EmailCampaignPage(){
               <Table size="small"><TableHead><TableRow><TableCell>Empresa</TableCell><TableCell>CNPJ</TableCell><TableCell>E-mail</TableCell><TableCell>Tentativas</TableCell></TableRow></TableHead><TableBody>{pendentesLista.map(r=><TableRow key={r.id}><TableCell>{r.razao_social||r.nome_fantasia||'-'}</TableCell><TableCell>{r.cnpj||'-'}</TableCell><TableCell>{r.email}</TableCell><TableCell>{r.tentativas||0}</TableCell></TableRow>)}</TableBody></Table>
             </Stack>
           </Paper>}
+          </>}
         </Stack>
       </Paper>
     </Stack>}

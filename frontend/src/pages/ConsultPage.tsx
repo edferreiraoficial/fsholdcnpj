@@ -32,7 +32,7 @@ const formatDateBR = (value:any) => {
 
 export default function ConsultPage() {
   const [selectedEmailIds,setSelectedEmailIds]=useState<number[]>([]);
-  const [q,setQ]=useState(''), [uf,setUf]=useState(''), [municipio,setMunicipio]=useState('');
+  const [q,setQ]=useState(''), [emailBusca,setEmailBusca]=useState(''), [uf,setUf]=useState(''), [municipio,setMunicipio]=useState('');
   const [municipioBusca,setMunicipioBusca]=useState('');
   const [situacao,setSituacao]=useState(''), [motivo,setMotivo]=useState('');
   const [dataSituacaoDe,setDataSituacaoDe]=useState(''), [dataSituacaoAte,setDataSituacaoAte]=useState('');
@@ -64,6 +64,7 @@ export default function ConsultPage() {
 
   const currentParams = () => ({
     q:q||undefined,
+    email:emailBusca||undefined,
     uf:uf||undefined,
     municipio:municipio||undefined,
     situacao:situacao||undefined,
@@ -126,10 +127,7 @@ export default function ConsultPage() {
         responseType: 'blob'
       });
 
-      const contentType = String(
-      response.headers['content-type'] ?? ''
-      );
-
+      const contentType = String(response.headers['content-type'] ?? '');
       if (contentType.includes('application/json')) {
         const texto = await response.data.text();
         const json = JSON.parse(texto);
@@ -172,7 +170,7 @@ export default function ConsultPage() {
 
   const clear = () => {
     setSelectedEmailIds([]);
-    setQ('');setUf('');setMunicipio('');setMunicipioBusca('');setSituacao('');setMotivo('');
+    setQ('');setEmailBusca('');setUf('');setMunicipio('');setMunicipioBusca('');setSituacao('');setMotivo('');
     setDataSituacaoDe('');setDataSituacaoAte('');
     setCnae('');setPorte('');
     setSimples('');setMei('');setStatus('');setPrioridade('');setTemTelefone('');
@@ -183,6 +181,14 @@ export default function ConsultPage() {
     setSelectedEmailIds(prev=>
       prev.includes(id) ? prev.filter(x=>x!==id) : [...prev,id]
     );
+  };
+
+  const atualizarStatusTempoReal=async(prospectId:number,statusId:number)=>{
+    try{
+      await api.patch(`/prospects/${prospectId}/crm`,{statusId});
+      setItems(prev=>prev.filter((x:any)=>Number(x.prospect_id)!==prospectId || statusId!==10).map((x:any)=>Number(x.prospect_id)===prospectId?{...x,status_tempo_real:statusId,status_id:statusId,status_crm:(filters.status||[]).find((st:any)=>Number(st.id)===statusId)?.nome||x.status_crm}:x));
+      if(statusId===10) setTotal(t=>Math.max(0,t-1));
+    }catch(e:any){setError(e?.response?.data?.message||e.message||'Não foi possível atualizar o status.');}
   };
 
   const abrirEmailDireto=()=>{
@@ -204,8 +210,11 @@ export default function ConsultPage() {
 
     <Paper variant="outlined" sx={{p:{xs:2,md:3}}}>
       <Grid container spacing={2}>
-        <Grid item xs={12} lg={5}>
+        <Grid item xs={12} lg={4}>
           <TextField fullWidth label="CNPJ, empresa, fantasia ou sócio" value={q} onChange={e=>setQ(e.target.value)}/>
+        </Grid>
+        <Grid item xs={12} md={6} lg={3}>
+          <TextField fullWidth label="Parte do e-mail" value={emailBusca} onChange={e=>setEmailBusca(e.target.value)} placeholder="ex.: gmail.com ou financeiro"/>
         </Grid>
         <Grid item xs={6} lg={1.5}>
           <TextField select fullWidth label="UF" value={uf} onChange={e=>{setUf(e.target.value);setMunicipio('');setMunicipioBusca('')}}>
@@ -213,7 +222,7 @@ export default function ConsultPage() {
             {['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(x=><MenuItem key={x} value={x}>{x}</MenuItem>)}
           </TextField>
         </Grid>
-        <Grid item xs={6} lg={5.5}>
+        <Grid item xs={6} lg={4}>
           <Autocomplete
             options={municipios}
             value={municipio || null}
@@ -237,7 +246,6 @@ export default function ConsultPage() {
                 {...p}
                 label="Município"
                 placeholder="DIGITE 2 OU MAIS LETRAS"
-                helperText="A lista é filtrada automaticamente a partir da 2ª letra."
                 inputProps={{
                   ...p.inputProps,
                   style: { textTransform: 'uppercase' }
@@ -398,7 +406,7 @@ export default function ConsultPage() {
         <TableHead><TableRow>
           <TableCell padding="checkbox"><Checkbox disabled/></TableCell>
           <TableCell>CNPJ</TableCell><TableCell>Empresa</TableCell><TableCell>Município</TableCell>
-          <TableCell>Situação</TableCell><TableCell>Data situação</TableCell><TableCell>CNAE</TableCell><TableCell>Capital</TableCell>
+          <TableCell>Situação</TableCell><TableCell>Data situação</TableCell><TableCell>CNAE</TableCell>{(capitalMin||capitalMax)&&<TableCell>Capital</TableCell>}
           <TableCell>Contato</TableCell><TableCell>Simples/MEI</TableCell><TableCell>CRM</TableCell><TableCell/>
         </TableRow></TableHead>
         <TableBody>
@@ -419,10 +427,10 @@ export default function ConsultPage() {
               {formatDateBR(r.data_situacao)}
             </TableCell>
             <TableCell sx={{minWidth:200}}><Typography>{r.cnae_principal||'-'}</Typography><Typography variant="caption">{r.cnae_descricao||''}</Typography></TableCell>
-            <TableCell>{money(r.capital_social)}</TableCell>
+            {(capitalMin||capitalMax)&&<TableCell>{money(r.capital_social)}</TableCell>}
             <TableCell sx={{minWidth:170}}><Typography>{r.telefone1||'-'}</Typography><Typography variant="caption">{r.email||''}</Typography></TableCell>
             <TableCell><Stack direction="row" spacing={0.5}>{r.simples==='S'&&<Chip size="small" label="Simples"/>}{r.mei==='S'&&<Chip size="small" label="MEI"/>}</Stack></TableCell>
-            <TableCell><Typography>{r.status_crm||'Não contatado'}</Typography><Typography variant="caption">{r.prioridade||'NORMAL'}</Typography></TableCell>
+            <TableCell sx={{minWidth:145}}><TextField select fullWidth value={Number(r.status_tempo_real||r.status_id||1)} onChange={e=>atualizarStatusTempoReal(Number(r.prospect_id),Number(e.target.value))}>{(filters.status||[]).map((st:any)=><MenuItem key={st.id} value={Number(st.id)}>{st.id} - {st.nome}</MenuItem>)}</TextField></TableCell>
             <TableCell><Button size="small" onClick={async()=>{setDetail((await api.get(`/prospects/${r.prospect_id}`)).data);setTab(0)}}>Abrir</Button></TableCell>
           </TableRow>)}
         </TableBody>

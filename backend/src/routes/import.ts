@@ -21,7 +21,7 @@ async function readMunicipiosZip() {
   const rows:any[]=[];
 
   const openZip=(p:string)=>new Promise<any>((resolve,reject)=>{
-    yauzl.open(p,{lazyEntries:true,autoClose:false},(e,z)=>e?reject(e):resolve(z));
+    yauzl.open(p,{lazyEntries:true,autoClose:false},(e:any,z:any)=>e?reject(e):resolve(z));
   });
   const nextEntry=(zip:any)=>new Promise<any>((resolve,reject)=>{
     const onEntry=(e:any)=>done(resolve,e),onEnd=()=>done(resolve,null),onError=(e:any)=>done(reject,e);
@@ -137,10 +137,10 @@ export async function importRoutes(app:FastifyInstance){
     }).parse(req.body);
 
     try{await pool.query('SELECT 1');}
-    catch(error:any){
+    catch(e:any){
       return reply.code(503).send({
         message:'Banco indisponível. Verifique o túnel SSH.',
-        error:error?.message
+        error:e?.message
       });
     }
 

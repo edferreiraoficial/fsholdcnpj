@@ -6,6 +6,7 @@ import { pool } from '../lib/db.js';
 
 const prospectFilterSchema = z.object({
   q: z.string().optional(),
+  email: z.string().optional(),
   uf: z.string().optional(),
   municipio: z.string().optional(),
   situacao: z.string().optional(),
@@ -67,6 +68,8 @@ function buildFilteredBase(f: ProspectFilters) {
     params.push(like, like, like, like);
   }
 
+  if (f.email) add('LOWER(v.email) LIKE LOWER(?)', `%${f.email}%`);
+
   if (f.uf) add('v.uf=?', f.uf);
   if (f.municipio) add('UPPER(v.municipio)=UPPER(?)', f.municipio);
   if (f.situacao) add('v.situacao_cadastral=?', f.situacao);
@@ -92,7 +95,11 @@ function buildFilteredBase(f: ProspectFilters) {
   if (f.porte) add('v.porte=?', f.porte);
   if (f.simples) add('v.simples=?', f.simples);
   if (f.mei) add('v.mei=?', f.mei);
-  if (f.status) add('v.status_id=?', f.status);
+  if (f.status) {
+    add('COALESCE(pc_base.status_tempo_real,pc_base.status_id,v.status_id)=?', f.status);
+  } else {
+    where.push('COALESCE(pc_base.status_tempo_real,pc_base.status_id,v.status_id,0)<>10');
+  }
   if (f.prioridade) add('v.prioridade=?', f.prioridade);
 
   if (f.temTelefone === 'S') {
@@ -116,6 +123,8 @@ function buildFilteredBase(f: ProspectFilters) {
       ON p_base.id = v.prospect_id
     JOIN estabelecimentos e_base
       ON e_base.id = p_base.estabelecimento_id
+    LEFT JOIN prospect_crm pc_base
+      ON pc_base.prospect_id = v.prospect_id
     WHERE ${where.join(' AND ')}
   `;
 
@@ -225,6 +234,7 @@ export async function prospectRoutes(app: FastifyInstance) {
     const [rows] = await pool.query(`
       SELECT
         v.*,
+        COALESCE(pc_base.status_tempo_real,pc_base.status_id,v.status_id) AS status_tempo_real,
         e_base.data_situacao AS data_situacao,
         e_base.motivo_situacao_codigo AS motivo_situacao_codigo
       ${base}
@@ -422,11 +432,13 @@ export async function prospectRoutes(app: FastifyInstance) {
     const [rows] = await pool.query(`
       SELECT
         v.*,
+        COALESCE(pc.status_tempo_real,pc.status_id,v.status_id) AS status_tempo_real,
         e.data_situacao AS data_situacao,
         e.motivo_situacao_codigo
       FROM vw_prospects_completos v
       JOIN prospects p ON p.id=v.prospect_id
       JOIN estabelecimentos e ON e.id=p.estabelecimento_id
+      LEFT JOIN prospect_crm pc ON pc.prospect_id=v.prospect_id
       WHERE v.prospect_id=?
     `, [id]);
 
@@ -485,6 +497,9 @@ export async function prospectRoutes(app: FastifyInstance) {
     if (body.statusId !== undefined) {
       sets.push('status_id=?');
       params.push(body.statusId);
+      sets.push('status_tempo_real=?');
+      params.push(body.statusId);
+      sets.push('status_atualizado_em=NOW()');
     }
     if (body.prioridade !== undefined) {
       sets.push('prioridade=?');
@@ -509,6 +524,14 @@ export async function prospectRoutes(app: FastifyInstance) {
         `UPDATE prospect_crm SET ${sets.join(',')} WHERE prospect_id=?`,
         params
       );
+    }
+
+    if (body.statusId !== undefined) {
+      if (body.statusId === 10) {
+        await pool.query(`UPDATE email_campanha_destinatarios SET status='REMOVIDO',erro='Status 10 - Não contatar' WHERE prospect_id=? AND status='PENDENTE'`,[id]);
+      } else {
+        await pool.query(`UPDATE email_campanha_destinatarios SET status='PENDENTE',erro=NULL WHERE prospect_id=? AND status='REMOVIDO' AND erro='Status 10 - Não contatar'`,[id]);
+      }
     }
 
     return { ok: true };

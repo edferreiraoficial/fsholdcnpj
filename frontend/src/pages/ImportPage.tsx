@@ -25,17 +25,7 @@ export default function ImportPage(){
 
   useEffect(()=>{
     const t=setTimeout(()=>api.get('/import/municipios',{params:{uf,q:municipioBusca}})
-    .then(r => {
-    const municipios = Array.from(
-      new Set<string>(
-        (r.data || [])
-          .map((x: any) => String(x.nome ?? ''))
-          .filter(Boolean)
-      ) 
-    );
-
-    setMunicipioOptions(['TODAS', ...municipios]);
-  })
+      .then(r=>{const municipios=Array.from(new Set<string>((r.data||[]).map((x:any)=>String(x.nome??'')).filter(Boolean)));setMunicipioOptions(['TODAS',...municipios])})
       .catch(()=>setMunicipioOptions(['TODAS'])),250);
     return()=>clearTimeout(t);
   },[uf,municipioBusca]);
