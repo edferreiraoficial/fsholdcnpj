@@ -137,10 +137,10 @@ export async function importRoutes(app:FastifyInstance){
     }).parse(req.body);
 
     try{await pool.query('SELECT 1');}
-    catch(e:any){
+    catch(error:any){
       return reply.code(503).send({
         message:'Banco indisponível. Verifique o túnel SSH.',
-        error:e?.message
+        error:error?.message
       });
     }
 

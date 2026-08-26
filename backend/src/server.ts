@@ -14,11 +14,12 @@ await app.register(prospectRoutes);
 await app.register(importRoutes);
 await app.register(emailRoutes);
 
-app.setErrorHandler((error,_req,reply)=>{
+app.setErrorHandler((error: any, _req, reply) => {
   app.log.error(error);
-  reply.code((error as any).statusCode||500).send({
-    message:error.message||'Erro interno',
-    code:(error as any).code
+
+  reply.code(error.statusCode || 500).send({
+    message: error.message || 'Erro interno',
+    code: error.code
   });
 });
 
