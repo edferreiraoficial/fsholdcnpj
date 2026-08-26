@@ -1,1 +1,1 @@
-{"root":["./src/App.tsx","./src/main.tsx"],"errors":true,"version":"5.8.3"}
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/healthbar.tsx","./src/lib/api.ts","./src/pages/consultpage.tsx","./src/pages/dashboardpage.tsx","./src/pages/directemailpage.tsx","./src/pages/emailcampaignpage.tsx","./src/pages/emailgroupspanel.tsx","./src/pages/emailsenderspanel.tsx","./src/pages/importpage.tsx"],"version":"5.9.3"}
