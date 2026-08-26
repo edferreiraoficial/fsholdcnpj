@@ -4,12 +4,11 @@ import { job } from '../importer/job.js';
 
 export async function healthRoutes(app: FastifyInstance) {
   app.get('/health', async () => {
-    const db = await dbHealth();
+    const database = await dbHealth();
     return {
       ok: true,
       api: true,
-      database: db,
-      tunnel: db.ok,
+      database,
       importer: {
         running: job.running,
         startedAt: job.startedAt,

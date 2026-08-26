@@ -1,40 +1,36 @@
-<<<<<<< HEAD
-.env
-**/.env
+# Dependências
 node_modules/
-**/node_modules/
-dist/
-**/dist/
-*.log
-backend/cache/*
-!backend/cache/.gitkeep
-frontend/tsconfig.tsbuildinfo
-=======
-<<<<<<< HEAD
-node_modules/
-dist/
-build/
+backend/node_modules/
+frontend/node_modules/
 
+# Variáveis e credenciais
 .env
-.env.local
-.env.production
+.env.*
+!.env.example
+backend/.env
+frontend/.env
 
+# Builds
+dist/
+backend/dist/
+frontend/dist/
+
+# Compactados / backups
+*.rar
+*.zip
+*.7z
+
+# Logs
 *.log
-
-coverage/
-
-.vscode/
-
-.DS_Store
-
+logs/
 npm-debug.log*
 
-.cache/
+# Cache
+cache/
+backend/cache/
 
-temp/
-=======
-.env
-node_modules/
-*.log
->>>>>>> 26990be254c4b2667a6bd42482c37928df473520
->>>>>>> 3e7226b891f18b3e217e275d808991e33931895b
+# Sistema / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+*.tsbuildinfo

@@ -1,0 +1,1 @@
+ALTER TABLE municipios MODIFY COLUMN uf CHAR(2) NULL;

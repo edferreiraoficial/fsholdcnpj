@@ -1,5 +1,5 @@
-import type { FastifyReply } from 'fastify';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
+import type { FastifyReply } from 'fastify';
 
 export type ImportFilters = {
   uf: string;
@@ -11,10 +11,10 @@ export type ImportFilters = {
   porte: string[];
   simples: '' | 'S' | 'N';
   mei: '' | 'S' | 'N';
-  resume?: boolean;
+  resume: boolean;
 };
 
-export type ImportJob = {
+export const job: {
   running: boolean;
   startedAt: string | null;
   finishedAt: string | null;
@@ -23,9 +23,7 @@ export type ImportJob = {
   logs: string[];
   filters: ImportFilters | null;
   child?: ChildProcessWithoutNullStreams;
-};
-
-export const job: ImportJob = {
+} = {
   running: false,
   startedAt: null,
   finishedAt: null,
@@ -37,28 +35,22 @@ export const job: ImportJob = {
 
 const clients = new Set<FastifyReply>();
 
-export function appendLog(text: string) {
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trimEnd();
-    if (!line) continue;
-    job.logs.push(line);
-    broadcast({ type: 'log', line });
-  }
-  if (job.logs.length > 2500) job.logs.splice(0, job.logs.length - 2500);
-}
-
-export function broadcast(payload: unknown) {
-  const data = `data: ${JSON.stringify(payload)}\n\n`;
-  for (const reply of clients) {
-    try {
-      reply.raw.write(data);
-    } catch {
-      clients.delete(reply);
-    }
-  }
-}
-
-export function addSseClient(reply: FastifyReply) {
+export function addClient(reply: FastifyReply) {
   clients.add(reply);
   reply.raw.on('close', () => clients.delete(reply));
+}
+
+export function emit(payload: unknown) {
+  const msg = `data: ${JSON.stringify(payload)}\n\n`;
+  for (const client of clients) {
+    try { client.raw.write(msg); } catch { clients.delete(client); }
+  }
+}
+
+export function logLine(text: string) {
+  for (const line of text.split(/\r?\n/).filter(Boolean)) {
+    job.logs.push(line);
+    emit({ type: 'log', line });
+  }
+  if (job.logs.length > 3000) job.logs.splice(0, job.logs.length - 3000);
 }

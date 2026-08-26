@@ -25,19 +25,3 @@ export async function dbHealth() {
     return { ok: false, error: error?.message || 'Banco indisponível' };
   }
 }
-
-export async function queryWithRetry(sql: string, params: any[] = [], retries = 1) {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      return await pool.query(sql, params);
-    } catch (error: any) {
-      const transient =
-        ['PROTOCOL_CONNECTION_LOST', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT'].includes(error?.code) ||
-        /closed state|connection.*closed/i.test(error?.message || '');
-
-      if (!transient || attempt === retries) throw error;
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }
-  throw new Error('Falha inesperada de conexão');
-}
