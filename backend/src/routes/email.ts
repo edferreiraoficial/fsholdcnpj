@@ -53,7 +53,7 @@ function buildWhere(f: Filters) {
     params.push(like,like,like,like);
   }
 
-  if(f.email) add('LOWER(v.email) LIKE LOWER(?)',`%${f.email}%`);
+  if(f.email?.trim()) add("LOWER(TRIM(COALESCE(v.email,''))) LIKE ?",`%${f.email.trim().toLowerCase()}%`);
 
   if(f.uf) add('v.uf=?',f.uf);
   if(f.municipio) add('UPPER(v.municipio)=UPPER(?)',f.municipio);

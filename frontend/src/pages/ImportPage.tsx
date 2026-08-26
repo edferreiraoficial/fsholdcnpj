@@ -64,7 +64,7 @@ export default function ImportPage(){
           <Grid item xs={12} md={8}><Autocomplete multiple freeSolo options={municipioOptions} value={municipios}
             inputValue={municipioBusca} onInputChange={(_,v)=>setMunicipioBusca(v)}
             onChange={(_,v)=>{const vals=v.map(String);setMunicipios(vals.includes('TODAS')?[]:vals)}}
-            renderInput={p=><TextField {...p} label="Cidades" placeholder="Todas ou digite para buscar" helperText="O autocomplete usa o nome oficial existente no banco."/>}/>
+            renderInput={p=><TextField {...p} label="Cidades" placeholder="Todas ou digite para buscar"/>}/>
           </Grid>
 
           <Grid item xs={12} md={6}><Autocomplete multiple options={[{codigo:'',descricao:'TODOS'},...motivoOptions]} value={motivos}

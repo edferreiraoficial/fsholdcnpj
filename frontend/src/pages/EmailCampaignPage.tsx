@@ -21,6 +21,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography
@@ -87,6 +88,8 @@ export default function EmailCampaignPage(){
   const [grupoRemetenteId,setGrupoRemetenteId]=useState<number|''>('');
   const [pendentesLista,setPendentesLista]=useState<any[]>([]);
   const [pendentesListaTotal,setPendentesListaTotal]=useState(0);
+  const [pendentesListaPage,setPendentesListaPage]=useState(0);
+  const [pendentesListaPageSize,setPendentesListaPageSize]=useState(25);
 
   const [modelos,setModelos]=useState<Modelo[]>([]);
   const [modeloId,setModeloId]=useState<number|''>('');
@@ -137,6 +140,8 @@ export default function EmailCampaignPage(){
   },[]);
 
 
+  useEffect(()=>{ if(campanhaId&&!enviarSemCampanha) carregarPendentesCampanha(campanhaId,pendentesListaPage,pendentesListaPageSize); },[pendentesListaPage,pendentesListaPageSize]);
+
   const carregarGruposRemetentes=async()=>{
     try{
       const {data}=await api.get('/email-sender-groups');
@@ -146,9 +151,17 @@ export default function EmailCampaignPage(){
     }catch{}
   };
 
-  const carregarPendentesCampanha=async(id=campanhaId)=>{
+  const carregarPendentesCampanha=async(id=campanhaId,page=pendentesListaPage,pageSize=pendentesListaPageSize)=>{
     if(!id){setPendentesLista([]);setPendentesListaTotal(0);return;}
-    try{const {data}=await api.get(`/email-campaigns/${id}/recipients`,{params:{status:'PENDENTE',page:1,pageSize:100}});setPendentesLista(data.items||[]);setPendentesListaTotal(Number(data.total||0));}catch{}
+    try{
+      const {data}=await api.get(`/email-campaigns/${id}/recipients`,{params:{status:'PENDENTE',page:page+1,pageSize}});
+      const totalAtual=Number(data.total||0);
+      setPendentesLista(data.items||[]);
+      setPendentesListaTotal(totalAtual);
+      if(totalAtual>0 && page>0 && page*pageSize>=totalAtual){
+        setPendentesListaPage(Math.max(0,Math.ceil(totalAtual/pageSize)-1));
+      }
+    }catch{}
   };
 
   const carregarRemetentes=async()=>{
@@ -504,7 +517,7 @@ export default function EmailCampaignPage(){
       setNome(c.nome ?? '');
       setAssunto(c.assunto ?? '');
       setCorpoHtml(c.corpo_html ?? '');
-      setCampanhaId(id);
+      setCampanhaId(id);setPendentesListaPage(0);
       carregarPendentesCampanha(id);
       if(c.remetente_id) setRemetenteId(Number(c.remetente_id));
       if(c.grupo_remetente_id) setGrupoRemetenteId(Number(c.grupo_remetente_id));
@@ -546,7 +559,7 @@ export default function EmailCampaignPage(){
         throw new Error(data.message||'Não foi possível adicionar os destinatários.');
       }
 
-      setCampanhaId(id);
+      setCampanhaId(id);setPendentesListaPage(0);
       carregarPendentesCampanha(id);
       setPendentes(Number(data.pendentes||0));
       setEnviados(Number(data.enviados||0));
@@ -584,7 +597,7 @@ export default function EmailCampaignPage(){
       }
 
       setDetalhe(data);
-      setCampanhaId(id);
+      setCampanhaId(id);setPendentesListaPage(0);
       carregarPendentesCampanha(id);
 
       const stats=data.stats||{};
@@ -1045,8 +1058,9 @@ export default function EmailCampaignPage(){
                 <Typography variant="h6" fontWeight={700} sx={{flexGrow:1}}>Destinatários ainda não enviados ({pendentesListaTotal.toLocaleString('pt-BR')})</Typography>
                 <Button size="small" variant="outlined" onClick={()=>carregarPendentesCampanha()}>Atualizar</Button>
               </Stack>
-              <Typography variant="body2" color="text.secondary">A lista abaixo mostra os primeiros 100 pendentes e diminui automaticamente após cada lote.</Typography>
+              <Typography variant="body2" color="text.secondary">A relação diminui automaticamente conforme os lotes são enviados.</Typography>
               <Table size="small"><TableHead><TableRow><TableCell>Empresa</TableCell><TableCell>CNPJ</TableCell><TableCell>E-mail</TableCell><TableCell>Tentativas</TableCell></TableRow></TableHead><TableBody>{pendentesLista.map(r=><TableRow key={r.id}><TableCell>{r.razao_social||r.nome_fantasia||'-'}</TableCell><TableCell>{r.cnpj||'-'}</TableCell><TableCell>{r.email}</TableCell><TableCell>{r.tentativas||0}</TableCell></TableRow>)}</TableBody></Table>
+              <TablePagination component="div" count={pendentesListaTotal} page={pendentesListaPage} rowsPerPage={pendentesListaPageSize} onPageChange={(_,p)=>setPendentesListaPage(p)} onRowsPerPageChange={e=>{setPendentesListaPageSize(Number(e.target.value));setPendentesListaPage(0)}} rowsPerPageOptions={[25,50,100]}/>
             </Stack>
           </Paper>}
           </>}
@@ -1283,6 +1297,7 @@ export default function EmailCampaignPage(){
               )}
             </TableBody>
           </Table>
+          <TablePagination component="div" count={destTotal} page={Math.max(0,destPage-1)} rowsPerPage={50} onPageChange={(_,p)=>carregarDestinatarios(detalhe?.campanha?.id||campanhaId,p+1,statusDest)} rowsPerPageOptions={[50]}/>
         </Stack>
       </Paper>}
     </Stack>}
