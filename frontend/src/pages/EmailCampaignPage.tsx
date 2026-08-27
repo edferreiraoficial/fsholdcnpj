@@ -391,7 +391,8 @@ export default function EmailCampaignPage(){
       setFalhas(Number(stats.falhas||0));
       await carregarPendentesCampanha(id);
       if(data.lote_status==='CONCLUIDO'){setSending(false);setSucesso(data.lote_mensagem||'Lote concluído.');await carregarHistorico();}
-      if(data.lote_status==='PAUSADO'||data.lote_status==='ERRO'){setSending(false);setErro(data.lote_mensagem||'O lote foi interrompido.');await carregarHistorico();}
+      if(data.lote_status==='PAUSADO'||data.lote_status==='PARADO'){setSending(false);setSucesso(data.lote_mensagem||'O envio foi interrompido. Os destinatários restantes continuam pendentes.');await carregarHistorico();}
+      if(data.lote_status==='ERRO'){setSending(false);setErro(data.lote_mensagem||'O lote foi interrompido por erro.');await carregarHistorico();}
     }catch{}
   };
 
@@ -414,6 +415,28 @@ export default function EmailCampaignPage(){
       setSucesso(data.message||'Lote iniciado em segundo plano. Você pode permanecer na tela acompanhando o progresso.');
       await atualizarProgresso(campanhaId);
     }catch(e:any){setSending(false);setErro(e?.response?.data?.message||e.message);}
+  };
+
+  const pausarEnvio=async()=>{
+    if(!campanhaId) return;
+    setErro(''); setSucesso('');
+    try{
+      const {data}=await api.post(`/email-campaigns/${campanhaId}/pause`,{}, {timeout:15000});
+      if(data.ok===false) throw new Error(data.message||'Não foi possível pausar o envio.');
+      setSucesso(data.message||'Pausa solicitada.');
+      await atualizarProgresso(campanhaId);
+    }catch(e:any){setErro(e?.response?.data?.message||e.message);}
+  };
+
+  const pararEnvio=async()=>{
+    if(!campanhaId) return;
+    setErro(''); setSucesso('');
+    try{
+      const {data}=await api.post(`/email-campaigns/${campanhaId}/stop`,{}, {timeout:15000});
+      if(data.ok===false) throw new Error(data.message||'Não foi possível parar o envio.');
+      setSucesso(data.message||'Parada solicitada.');
+      await atualizarProgresso(campanhaId);
+    }catch(e:any){setErro(e?.response?.data?.message||e.message);}
   };
 
   const salvarNovoModelo=async()=>{
@@ -663,7 +686,7 @@ export default function EmailCampaignPage(){
 
     {erro&&<Alert severity="error">{erro}</Alert>}
     {sucesso&&<Alert severity="success">{sucesso}</Alert>}
-    {progressoLote&&campanhaId&&<Paper variant="outlined" sx={{p:1.2}}><Stack spacing={.7}><Stack direction="row" spacing={1} alignItems="center"><Typography fontWeight={700}>Envio em tempo real</Typography><Chip label={progressoLote.lote_status||'PARADO'} variant="outlined"/><Typography variant="caption">{progressoLote.lote_mensagem||''}</Typography></Stack><LinearProgress variant="determinate" value={Number(progressoLote.lote_total||0)?Math.min(100,Number(progressoLote.lote_processados||0)*100/Number(progressoLote.lote_total||1)):0}/><Typography variant="caption">Lote: {Number(progressoLote.lote_processados||0)}/{Number(progressoLote.lote_total||0)} · enviados {Number(progressoLote.lote_enviados||0)} · falhas {Number(progressoLote.lote_falhas||0)} · pendentes gerais {Number(progressoLote.stats?.pendentes||0)}</Typography></Stack></Paper>}
+    {progressoLote&&campanhaId&&<Paper variant="outlined" sx={{p:1.2}}><Stack spacing={.7}><Stack direction={{xs:'column',md:'row'}} spacing={1} alignItems={{md:'center'}}><Typography fontWeight={700}>Envio em tempo real</Typography><Chip label={progressoLote.lote_status||'PARADO'} variant="outlined"/><Typography variant="caption" sx={{flex:1}}>{progressoLote.lote_mensagem||''}</Typography>{sending&&<><Button size="small" variant="outlined" onClick={pausarEnvio} disabled={['PAUSA_SOLICITADA','PARADA_SOLICITADA'].includes(String(progressoLote.lote_status||''))}>Pausar</Button><Button size="small" variant="outlined" color="error" onClick={pararEnvio} disabled={String(progressoLote.lote_status||'')==='PARADA_SOLICITADA'}>Parar envio</Button></>}</Stack><LinearProgress variant="determinate" value={Number(progressoLote.lote_total||0)?Math.min(100,Number(progressoLote.lote_processados||0)*100/Number(progressoLote.lote_total||1)):0}/><Typography variant="caption">Lote: {Number(progressoLote.lote_processados||0)}/{Number(progressoLote.lote_total||0)} · enviados {Number(progressoLote.lote_enviados||0)} · falhas {Number(progressoLote.lote_falhas||0)} · pendentes gerais {Number(progressoLote.stats?.pendentes||0)}</Typography></Stack></Paper>}
 
     <Paper variant="outlined">
       <Tabs value={tab} onChange={(_,v)=>setTab(v)}>
@@ -1033,8 +1056,10 @@ export default function EmailCampaignPage(){
               >
                 {sending
                   ? <CircularProgress size={20}/>
-                  : `Enviar até ${Math.min(quantidadeEnvio,pendentes||quantidadeEnvio).toLocaleString('pt-BR')}`}
+                  : `${['PAUSADO','PARADO'].includes(String(progressoLote?.lote_status||''))?'Continuar':'Enviar até'} ${Math.min(quantidadeEnvio,pendentes||quantidadeEnvio).toLocaleString('pt-BR')}`}
               </Button>
+              {sending&&<Button variant="outlined" onClick={pausarEnvio}>Pausar</Button>}
+              {sending&&<Button variant="outlined" color="error" onClick={pararEnvio}>Parar</Button>}
             </>)}
           </Stack>
 

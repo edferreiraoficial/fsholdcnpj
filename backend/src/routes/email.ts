@@ -1126,13 +1126,36 @@ export async function emailRoutes(app:FastifyInstance){
       const tx=(r:RemetenteConfig)=>{const k=chave(r);if(!transportes.has(k)) transportes.set(k,transporter(r));return transportes.get(k);};
       let cursor=0;
 
+      const encerrarPorComando=async(tipo:'PAUSADO'|'PARADO',mensagem:string)=>{
+        await pool.query(`UPDATE email_campanhas
+          SET status='PRONTA',lote_status=?,lote_mensagem=?,lote_atualizado_em=NOW(),
+              enviados=enviados+?,falhas=falhas+?
+          WHERE id=?`,[tipo,mensagem,ok,fail,id]);
+      };
+
+      const verificarComando=async()=>{
+        const [controlRows]=await pool.query(`SELECT lote_status FROM email_campanhas WHERE id=?`,[id]);
+        const status=String((controlRows as any[])[0]?.lote_status||'');
+        if(status==='PAUSA_SOLICITADA'){
+          await encerrarPorComando('PAUSADO','Envio pausado pelo usuário. Os destinatários restantes continuam pendentes. Você pode ajustar o grupo de remetentes e continuar depois.');
+          return true;
+        }
+        if(status==='PARADA_SOLICITADA'){
+          await encerrarPorComando('PARADO','Envio interrompido pelo usuário. Os destinatários restantes continuam pendentes.');
+          return true;
+        }
+        return false;
+      };
+
       for(let i=0;i<(rows as any[]).length;i++){
+        if(await verificarComando()) return;
         const r=(rows as any[])[i];
         let finalizado=false;
         while(!finalizado){
+          if(await verificarComando()) return;
           const disponiveis=remetentes.filter(x=>!bloqueados.has(chave(x)));
           if(!disponiveis.length){
-            await pool.query(`UPDATE email_campanhas SET status='PRONTA',lote_status='PAUSADO',lote_mensagem=?,lote_atualizado_em=NOW() WHERE id=?`,['Todos os remetentes do grupo ficaram indisponíveis. Os restantes continuam pendentes.',id]);
+            await pool.query(`UPDATE email_campanhas SET status='PRONTA',lote_status='PAUSADO',lote_mensagem=?,lote_atualizado_em=NOW(),enviados=enviados+?,falhas=falhas+? WHERE id=?`,['Todos os remetentes do grupo ficaram indisponíveis. Os restantes continuam pendentes.',ok,fail,id]);
             return;
           }
           let escolhido:RemetenteConfig|null=null;
@@ -1143,7 +1166,11 @@ export async function emailRoutes(app:FastifyInstance){
             if(espera<=0){escolhido=cand;cursor=(cursor+n+1)%Math.max(1,disponiveis.length);break;}
             menorEspera=Math.min(menorEspera,espera);
           }
-          if(!escolhido){await aguardar(Math.max(50,menorEspera));continue;}
+          if(!escolhido){
+            await aguardar(Math.max(50,Math.min(menorEspera,1000)));
+            continue;
+          }
+          if(await verificarComando()) return;
           try{
             await tx(escolhido).sendMail({from:fromAddress(escolhido),to:r.email,subject:renderTemplate(camp.assunto,r),html:renderTemplate(camp.corpo_html,r)});
             ultimoUso.set(chave(escolhido),Date.now());
@@ -1191,6 +1218,34 @@ export async function emailRoutes(app:FastifyInstance){
     campaignJobs.add(id);
     void processCampaignInBackground(id,body);
     return reply.code(202).send({ok:true,accepted:true,message:'Lote iniciado em segundo plano. Acompanhe o progresso na tela.'});
+  });
+
+  app.post('/email-campaigns/:id/pause', async (req,reply)=>{
+    const id=Number((req.params as any).id);
+    const [rows]=await pool.query(`SELECT id,status,lote_status FROM email_campanhas WHERE id=?`,[id]);
+    const camp=(rows as any[])[0];
+    if(!camp) return reply.code(404).send({ok:false,message:'Campanha não encontrada'});
+    if(camp.status==='CONCLUIDA') return reply.code(400).send({ok:false,message:'A campanha já foi concluída.'});
+    if(campaignJobs.has(id)){
+      await pool.query(`UPDATE email_campanhas SET lote_status='PAUSA_SOLICITADA',lote_mensagem='Pausa solicitada. Aguardando o envio em andamento terminar...',lote_atualizado_em=NOW() WHERE id=?`,[id]);
+      return {ok:true,message:'Pausa solicitada. O processamento será interrompido com segurança após o envio que já estiver em andamento.'};
+    }
+    await pool.query(`UPDATE email_campanhas SET status='PRONTA',lote_status='PAUSADO',lote_mensagem='Envio pausado pelo usuário.',lote_atualizado_em=NOW() WHERE id=?`,[id]);
+    return {ok:true,message:'Campanha pausada.'};
+  });
+
+  app.post('/email-campaigns/:id/stop', async (req,reply)=>{
+    const id=Number((req.params as any).id);
+    const [rows]=await pool.query(`SELECT id,status,lote_status FROM email_campanhas WHERE id=?`,[id]);
+    const camp=(rows as any[])[0];
+    if(!camp) return reply.code(404).send({ok:false,message:'Campanha não encontrada'});
+    if(camp.status==='CONCLUIDA') return reply.code(400).send({ok:false,message:'A campanha já foi concluída.'});
+    if(campaignJobs.has(id)){
+      await pool.query(`UPDATE email_campanhas SET lote_status='PARADA_SOLICITADA',lote_mensagem='Parada solicitada. Aguardando o envio em andamento terminar...',lote_atualizado_em=NOW() WHERE id=?`,[id]);
+      return {ok:true,message:'Parada solicitada. Os destinatários ainda não processados permanecerão pendentes.'};
+    }
+    await pool.query(`UPDATE email_campanhas SET status='PRONTA',lote_status='PARADO',lote_mensagem='Envio interrompido pelo usuário.',lote_atualizado_em=NOW() WHERE id=?`,[id]);
+    return {ok:true,message:'Envio interrompido.'};
   });
 
   app.get('/email-campaigns/:id/progress', async req=>{
