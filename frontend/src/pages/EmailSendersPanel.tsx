@@ -1,6 +1,6 @@
 import {
   Alert, Button, Checkbox, FormControlLabel, Grid, MenuItem,
-  Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow,
+  Paper, Stack, Table, TableBody, TableCell, TableHead, TablePagination, TableRow,
   TextField, Typography
 } from '@mui/material';
 import { useEffect, useState } from 'react';
@@ -25,6 +25,8 @@ export default function EmailSendersPanel({onChange}:{onChange?:()=>void}){
   const [teste,setTeste]=useState('');
   const [erro,setErro]=useState('');
   const [sucesso,setSucesso]=useState('');
+  const [page,setPage]=useState(0);
+  const [pageSize,setPageSize]=useState(25);
 
   const carregar=async()=>{
     const {data}=await api.get('/email-senders');
@@ -113,12 +115,13 @@ export default function EmailSendersPanel({onChange}:{onChange?:()=>void}){
 
     <Table size="small">
       <TableHead><TableRow><TableCell>Nome</TableCell><TableCell>E-mail</TableCell><TableCell>SMTP</TableCell><TableCell>Padrão</TableCell><TableCell>Rodízio</TableCell><TableCell>Último envio/erro</TableCell><TableCell>Ações</TableCell></TableRow></TableHead>
-      <TableBody>{items.map(r=><TableRow key={r.id}>
+      <TableBody>{items.slice(page*pageSize,page*pageSize+pageSize).map(r=><TableRow key={r.id}>
         <TableCell>{r.nome}</TableCell><TableCell>{r.email}</TableCell><TableCell>{r.smtp_host}:{r.smtp_port}</TableCell>
         <TableCell>{Boolean(r.padrao)?'Sim':'Não'}</TableCell><TableCell>{Boolean(r.rodizio)?'Sim':'Não'}</TableCell>
         <TableCell>{r.ultimo_erro?`Erro: ${String(r.ultimo_erro).slice(0,90)}`:(r.ultimo_envio_em?new Date(r.ultimo_envio_em).toLocaleString('pt-BR'):'-')}</TableCell>
         <TableCell><Stack direction="row" spacing={1}><Button size="small" onClick={()=>editar(r)}>Editar</Button><Button size="small" onClick={()=>testar(r.id)}>Testar</Button><Button size="small" color="error" onClick={()=>desativar(r.id)}>Desativar</Button></Stack></TableCell>
       </TableRow>)}</TableBody>
     </Table>
+    <TablePagination component="div" count={items.length} page={page} rowsPerPage={pageSize} onPageChange={(_,p)=>setPage(p)} onRowsPerPageChange={e=>{setPageSize(Number(e.target.value));setPage(0)}} rowsPerPageOptions={[25,50,100,250,500]}/>
   </Stack>;
 }

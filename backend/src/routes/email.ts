@@ -1275,7 +1275,7 @@ export async function emailRoutes(app:FastifyInstance){
     const q=z.object({
       status:z.enum(['','PENDENTE','ENVIADO','FALHOU','REMOVIDO']).default(''),
       page:z.coerce.number().min(1).default(1),
-      pageSize:z.coerce.number().min(10).max(200).default(50)
+      pageSize:z.coerce.number().min(10).max(500).default(50)
     }).parse(req.query);
 
     const where=['d.campanha_id=?'];

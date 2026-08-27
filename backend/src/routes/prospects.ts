@@ -18,6 +18,7 @@ const prospectFilterSchema = z.object({
   simples: z.string().optional(),
   mei: z.string().optional(),
   status: z.coerce.number().optional(),
+  ignorarStatus10: z.enum(['0','1']).default('1'),
   prioridade: z.string().optional(),
   temTelefone: z.string().optional(),
   temEmail: z.string().optional(),
@@ -35,7 +36,7 @@ const prospectFilterSchema = z.object({
 
 const listSchema = prospectFilterSchema.extend({
   page: z.coerce.number().min(1).default(1),
-  pageSize: z.coerce.number().min(10).max(100).default(25)
+  pageSize: z.coerce.number().min(10).max(500).default(25)
 });
 
 const exportSchema = prospectFilterSchema.extend({
@@ -97,7 +98,7 @@ function buildFilteredBase(f: ProspectFilters) {
   if (f.mei) add('v.mei=?', f.mei);
   if (f.status) {
     add('COALESCE(pc_base.status_tempo_real,pc_base.status_id,v.status_id)=?', f.status);
-  } else {
+  } else if (f.ignorarStatus10 !== '0') {
     where.push('COALESCE(pc_base.status_tempo_real,pc_base.status_id,v.status_id,0)<>10');
   }
   if (f.prioridade) add('v.prioridade=?', f.prioridade);
@@ -481,6 +482,76 @@ export async function prospectRoutes(app: FastifyInstance) {
     return { ...item, socios, contatos, propostas, tarefas };
   });
 
+  app.post('/prospects/bulk-status', async (req, reply) => {
+    const body = z.object({
+      statusId: z.coerce.number().int().positive(),
+      prospectIds: z.array(z.coerce.number().int().positive()).optional(),
+      filtros: prospectFilterSchema.partial().optional()
+    }).parse(req.body);
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.query(`DROP TEMPORARY TABLE IF EXISTS tmp_bulk_prospects`);
+      await conn.query(`CREATE TEMPORARY TABLE tmp_bulk_prospects (prospect_id BIGINT PRIMARY KEY) ENGINE=MEMORY`);
+
+      if (body.prospectIds?.length) {
+        const ids = Array.from(new Set(body.prospectIds));
+        for (let i=0;i<ids.length;i+=500) {
+          const lote=ids.slice(i,i+500);
+          await conn.query(
+            `INSERT IGNORE INTO tmp_bulk_prospects (prospect_id) VALUES ${lote.map(()=>'(?)').join(',')}`,
+            lote
+          );
+        }
+      } else {
+        const filtros = prospectFilterSchema.parse({...(body.filtros||{}), order:(body.filtros as any)?.order||'data_desc'});
+        const { base, params } = buildFilteredBase(filtros);
+        await conn.query(`INSERT IGNORE INTO tmp_bulk_prospects (prospect_id) SELECT DISTINCT v.prospect_id ${base}`, params);
+      }
+
+      const [countRows] = await conn.query(`SELECT COUNT(*) total FROM tmp_bulk_prospects`);
+      const total = Number((countRows as any[])[0]?.total||0);
+      if (!total) {
+        await conn.rollback();
+        return reply.code(400).send({message:'Nenhum prospect selecionado para alteração.'});
+      }
+
+      await conn.query(`
+        INSERT INTO prospect_crm (prospect_id,status_id,status_tempo_real,status_atualizado_em,prioridade)
+        SELECT prospect_id,?,?,NOW(),'NORMAL' FROM tmp_bulk_prospects
+        ON DUPLICATE KEY UPDATE
+          status_id=VALUES(status_id),
+          status_tempo_real=VALUES(status_tempo_real),
+          status_atualizado_em=NOW()
+      `,[body.statusId,body.statusId]);
+
+      if (body.statusId===10) {
+        await conn.query(`
+          UPDATE email_campanha_destinatarios d
+          JOIN tmp_bulk_prospects t ON t.prospect_id=d.prospect_id
+          SET d.status='REMOVIDO', d.erro='Status 10 - Não contatar'
+          WHERE d.status='PENDENTE'
+        `);
+      } else {
+        await conn.query(`
+          UPDATE email_campanha_destinatarios d
+          JOIN tmp_bulk_prospects t ON t.prospect_id=d.prospect_id
+          SET d.status='PENDENTE', d.erro=NULL
+          WHERE d.status='REMOVIDO' AND d.erro='Status 10 - Não contatar'
+        `);
+      }
+
+      await conn.commit();
+      return {ok:true,total,statusId:body.statusId};
+    } catch (error) {
+      try { await conn.rollback(); } catch {}
+      throw error;
+    } finally {
+      conn.release();
+    }
+  });
+
   app.patch('/prospects/:id/crm', async req => {
     const id = Number((req.params as any).id);
     const body = z.object({
@@ -519,6 +590,7 @@ export async function prospectRoutes(app: FastifyInstance) {
     }
 
     if (sets.length) {
+      await pool.query(`INSERT IGNORE INTO prospect_crm (prospect_id,status_id,status_tempo_real,status_atualizado_em,prioridade) VALUES (?,1,1,NOW(),'NORMAL')`,[id]);
       params.push(id);
       await pool.query(
         `UPDATE prospect_crm SET ${sets.join(',')} WHERE prospect_id=?`,

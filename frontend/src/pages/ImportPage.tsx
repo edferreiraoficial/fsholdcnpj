@@ -44,13 +44,13 @@ export default function ImportPage(){
   };
 
   return(
-    <Stack spacing={2}>
-      <Box><Typography variant="h5" fontWeight={700}>Importar da Receita</Typography>
+    <Stack spacing={1}>
+      <Box><Typography variant="h5" fontWeight={700}>Importar Empresas da Receita Federal</Typography>
       <Typography color="text.secondary">Vazio ou “Todos” significa sem filtro naquele campo.</Typography></Box>
       {error&&<Alert severity="error">{error}</Alert>}
 
-      <Paper variant="outlined" sx={{p:{xs:2,md:3},width:'100%'}}>
-        <Grid container spacing={2}>
+      <Paper variant="outlined" sx={{p:.75,width:'100%'}}>
+        <Grid container columnSpacing={.35} rowSpacing={.28}>
           <Grid item xs={12} md={2}><TextField select fullWidth label="UF" value={uf} onChange={e=>setUf(e.target.value)}>
             {['SP','MG','RJ','PR','SC','RS','GO','DF','BA','ES'].map(x=><MenuItem key={x} value={x}>{x}</MenuItem>)}
           </TextField></Grid>
@@ -95,9 +95,9 @@ export default function ImportPage(){
         </Grid>
       </Paper>
 
-      <Paper variant="outlined" sx={{p:2}}>
-        <Typography fontWeight={700} mb={1}>Log em tempo real</Typography>
-        <Box ref={logRef} sx={{height:320,overflow:'auto',bgcolor:'#101418',color:'#d8e1e8',p:1.5,borderRadius:1,fontFamily:'Consolas, monospace',fontSize:12}}>
+      <Paper variant="outlined" sx={{p:.75}}>
+        <Typography fontWeight={700} mb={.5}>Log em tempo real</Typography>
+        <Box ref={logRef} sx={{height:260,overflow:'auto',bgcolor:'#101418',color:'#d8e1e8',p:.75,borderRadius:1,fontFamily:'Consolas, monospace',fontSize:10.5}}>
           {logs.length?logs.map((x,i)=><div key={i}>{x}</div>):'Aguardando importação...'}
         </Box>
       </Paper>

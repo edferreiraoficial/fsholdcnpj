@@ -109,10 +109,13 @@ export default function EmailCampaignPage(){
   const [intervaloRemetenteSegundos,setIntervaloRemetenteSegundos]=useState(10);
 
   const [historico,setHistorico]=useState<any[]>([]);
+  const [historicoPage,setHistoricoPage]=useState(0);
+  const [historicoPageSize,setHistoricoPageSize]=useState(25);
   const [detalhe,setDetalhe]=useState<any|null>(null);
   const [destinatarios,setDestinatarios]=useState<any[]>([]);
   const [statusDest,setStatusDest]=useState('');
   const [destPage,setDestPage]=useState(1);
+  const [destPageSize,setDestPageSize]=useState(25);
   const [destTotal,setDestTotal]=useState(0);
 
   const selectedPreviewIds = useMemo(
@@ -188,6 +191,7 @@ export default function EmailCampaignPage(){
     try{
       const {data}=await api.get('/email-campaigns');
       setHistorico(data||[]);
+      setHistoricoPage(0);
     }catch{}
   };
 
@@ -615,7 +619,8 @@ export default function EmailCampaignPage(){
   const carregarDestinatarios=async(
     id=campanhaId,
     page=destPage,
-    status=statusDest
+    status=statusDest,
+    pageSize=destPageSize
   )=>{
     if(!id) return;
 
@@ -624,7 +629,7 @@ export default function EmailCampaignPage(){
       {
         params:{
           page,
-          pageSize:50,
+          pageSize,
           status
         }
       }
@@ -841,11 +846,6 @@ export default function EmailCampaignPage(){
           {composeTab===1 && <>
           <Divider/>
 
-          <Alert severity="info">
-            A variável <strong>{'{{whatsapp}}'}</strong> usa o número definido
-            no backend pela variável <strong>CRM_WHATSAPP</strong>.
-          </Alert>
-
           <Grid container spacing={2}>
             {adicionarCampanhaExistente && (
               <Grid item xs={12}>
@@ -1060,7 +1060,7 @@ export default function EmailCampaignPage(){
               </Stack>
               <Typography variant="body2" color="text.secondary">A relação diminui automaticamente conforme os lotes são enviados.</Typography>
               <Table size="small"><TableHead><TableRow><TableCell>Empresa</TableCell><TableCell>CNPJ</TableCell><TableCell>E-mail</TableCell><TableCell>Tentativas</TableCell></TableRow></TableHead><TableBody>{pendentesLista.map(r=><TableRow key={r.id}><TableCell>{r.razao_social||r.nome_fantasia||'-'}</TableCell><TableCell>{r.cnpj||'-'}</TableCell><TableCell>{r.email}</TableCell><TableCell>{r.tentativas||0}</TableCell></TableRow>)}</TableBody></Table>
-              <TablePagination component="div" count={pendentesListaTotal} page={pendentesListaPage} rowsPerPage={pendentesListaPageSize} onPageChange={(_,p)=>setPendentesListaPage(p)} onRowsPerPageChange={e=>{setPendentesListaPageSize(Number(e.target.value));setPendentesListaPage(0)}} rowsPerPageOptions={[25,50,100]}/>
+              <TablePagination component="div" count={pendentesListaTotal} page={pendentesListaPage} rowsPerPage={pendentesListaPageSize} onPageChange={(_,p)=>setPendentesListaPage(p)} onRowsPerPageChange={e=>{setPendentesListaPageSize(Number(e.target.value));setPendentesListaPage(0)}} rowsPerPageOptions={[25,50,100,250,500]}/>
             </Stack>
           </Paper>}
           </>}
@@ -1177,7 +1177,7 @@ export default function EmailCampaignPage(){
           </TableHead>
 
           <TableBody>
-            {historico.map(c=>
+            {historico.slice(historicoPage*historicoPageSize,historicoPage*historicoPageSize+historicoPageSize).map(c=>
               <TableRow key={c.id} hover>
                 <TableCell>{c.id}</TableCell>
                 <TableCell>{c.nome}</TableCell>
@@ -1202,6 +1202,7 @@ export default function EmailCampaignPage(){
             )}
           </TableBody>
         </Table>
+        <TablePagination component="div" count={historico.length} page={historicoPage} rowsPerPage={historicoPageSize} onPageChange={(_,p)=>setHistoricoPage(p)} onRowsPerPageChange={e=>{setHistoricoPageSize(Number(e.target.value));setHistoricoPage(0)}} rowsPerPageOptions={[25,50,100,250,500]}/>
       </Paper>
 
       {detalhe&&<Paper variant="outlined" sx={{p:3}}>
@@ -1229,7 +1230,8 @@ export default function EmailCampaignPage(){
                 carregarDestinatarios(
                   detalhe.campanha.id,
                   1,
-                  value
+                  value,
+                  destPageSize
                 );
               }}
               sx={{minWidth:220}}
@@ -1246,7 +1248,8 @@ export default function EmailCampaignPage(){
               onClick={()=>carregarDestinatarios(
                 detalhe.campanha.id,
                 destPage,
-                statusDest
+                statusDest,
+                destPageSize
               )}
             >
               Atualizar destinatários
@@ -1297,7 +1300,7 @@ export default function EmailCampaignPage(){
               )}
             </TableBody>
           </Table>
-          <TablePagination component="div" count={destTotal} page={Math.max(0,destPage-1)} rowsPerPage={50} onPageChange={(_,p)=>carregarDestinatarios(detalhe?.campanha?.id||campanhaId,p+1,statusDest)} rowsPerPageOptions={[50]}/>
+          <TablePagination component="div" count={destTotal} page={Math.max(0,destPage-1)} rowsPerPage={destPageSize} onPageChange={(_,p)=>carregarDestinatarios(detalhe?.campanha?.id||campanhaId,p+1,statusDest,destPageSize)} onRowsPerPageChange={e=>{const n=Number(e.target.value);setDestPageSize(n);carregarDestinatarios(detalhe?.campanha?.id||campanhaId,1,statusDest,n)}} rowsPerPageOptions={[25,50,100,250,500]}/>
         </Stack>
       </Paper>}
     </Stack>}

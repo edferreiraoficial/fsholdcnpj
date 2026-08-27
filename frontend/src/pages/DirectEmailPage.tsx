@@ -77,7 +77,7 @@ export default function DirectEmailPage(){
             <TableBody>{prospects.map(p=>{const id=Number(p.prospect_id);return <TableRow key={id} hover><TableCell padding="checkbox"><Checkbox size="small" disabled={!p.email} checked={selectedIds.includes(id)} onChange={()=>toggle(id)}/></TableCell><TableCell>{p.razao_social||p.nome_fantasia||'-'}</TableCell><TableCell>{p.cnpj}</TableCell><TableCell>{p.municipio}/{p.uf}</TableCell><TableCell>{p.email||'-'}</TableCell><TableCell>{p.situacao_cadastral||'-'}</TableCell></TableRow>})}</TableBody>
           </Table>
         </TableContainer>
-        <TablePagination component="div" count={total} page={page} rowsPerPage={pageSize} onPageChange={(_,p)=>setPage(p)} onRowsPerPageChange={e=>{setPageSize(Number(e.target.value));setPage(0)}} rowsPerPageOptions={[25,50,100]}/>
+        <TablePagination component="div" count={total} page={page} rowsPerPage={pageSize} onPageChange={(_,p)=>setPage(p)} onRowsPerPageChange={e=>{setPageSize(Number(e.target.value));setPage(0)}} rowsPerPageOptions={[25,50,100,250,500]}/>
       </Stack>
     </Paper>
 
