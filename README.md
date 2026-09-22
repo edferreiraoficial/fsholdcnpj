@@ -1,131 +1,64 @@
-# FSHold CNPJ
+# FS Hold — Serviços + CRM CNPJ
 
-CRM de prospecção contábil com importação filtrada dos Dados Abertos do CNPJ.
+Projeto consolidado da FS Hold. O site público de serviços e o CRM são independentes para que uma publicação não quebre a outra.
 
-## Arquitetura
+## Estrutura ativa
 
-- Frontend: React + TypeScript + Material UI + Vite
-- Backend: Node.js + Fastify + TypeScript
-- Banco: MariaDB 11.x na Hostinger
-- Importador: worker local no Windows
-- ZIPs da Receita: permanecem no Windows
-- Conexão local ao banco: túnel SSH `127.0.0.1:3307 -> 127.0.0.1:3306`
+- `servicos/` — site público estático para `servicos.fshold.com.br`.
+- `frontend/` — CRM React/Vite para `crm.fshold.com.br`.
+- `backend/` — API Fastify/Node para `api.fshold.com.br` (porta definida por `PORT`).
+- `database/` — migrations e ajustes do MariaDB.
+- `scripts/` — utilitários locais, inclusive túnel SSH.
 
-## Estrutura
+Arquivos antigos do importador standalone e backups de package foram removidos. A importação usada pelo CRM está em `backend/src/importer/` e é acionada pelas rotas do backend.
 
-```text
-fsholdcnpj-clean/
-├─ backend/
-├─ frontend/
-├─ database/
-├─ scripts/
-├─ .gitignore
-└─ README.md
-```
+## Desenvolvimento local
 
-## 1. Banco
-
-Use o banco já existente na Hostinger.
-
-A aplicação espera as tabelas e views:
-- empresas
-- estabelecimentos
-- socios
-- empresa_tributacao
-- prospects
-- prospect_crm
-- prospect_contatos
-- prospect_propostas
-- prospect_status
-- tarefas
-- importacoes_cnpj
-- importacao_arquivos
-- cnaes
-- municipios
-- motivos_situacao
-- naturezas_juridicas
-- qualificacoes_socios
-- vw_prospects_completos
-- vw_socios_prospects
-
-## 2. Túnel SSH
-
-No Windows:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\iniciar-tunel.ps1
-```
-
-Teste:
-
-```powershell
-Test-NetConnection 127.0.0.1 -Port 3307
-```
-
-## 3. Backend
-
+### Backend
 ```powershell
 cd backend
 npm install
 Copy-Item .env.example .env
-notepad .env
+# preencha DB_PASSWORD e demais dados reais no .env
 npm run dev
 ```
-
 API local: `http://localhost:3333`
 
-## 4. Frontend
-
+### Frontend CRM
 ```powershell
 cd frontend
 npm install
 Copy-Item .env.example .env
 npm run dev
 ```
+CRM local: `http://localhost:5173`
 
-Frontend local: `http://localhost:5173`
+### Site de serviços
+```powershell
+cd servicos
+python -m http.server 8080
+```
+Site local: `http://localhost:8080`
 
-## 5. GitHub
-
-Crie um repositório limpo ou substitua o conteúdo do repositório existente depois de validar localmente:
+## Build do CRM
 
 ```powershell
-git init
-git add .
-git commit -m "Reconstroi FSHold CNPJ em base limpa"
-git branch -M main
-git remote add origin https://github.com/edferreiraoficial/fsholdcnpj.git
-git push -u origin main
+cd backend
+npm run build
+cd ..\frontend
+$env:VITE_API_URL="https://api.fshold.com.br"
+npm run build
 ```
 
-Se o remoto já tiver histórico e você quiser substituí-lo pela base limpa, use apenas após validar tudo localmente:
+Publicação esperada:
+- conteúdo de `servicos/` -> `servicos.fshold.com.br`;
+- conteúdo de `frontend/dist/` -> `crm.fshold.com.br`;
+- aplicação Node de `backend/` -> `api.fshold.com.br`.
 
-```powershell
-git push --force-with-lease origin main
-```
+O frontend também possui fallback automático: em localhost usa `http://localhost:3333`; fora de localhost usa `https://api.fshold.com.br` quando `VITE_API_URL` não for definido no build.
 
-## 6. Importação
+## Banco e importação
 
-No painel, escolha:
-- UF
-- situação cadastral
-- cidades
-- motivos
-- CNAEs
-- porte
-- Simples
-- MEI
-- somente matrizes
-- retomada
+O backend usa MariaDB e as variáveis de `backend/.env`. Os ZIPs da Receita permanecem na máquina configurada em `CNPJ_ZIP_DIR`. Para acesso local ao banco remoto, use `scripts/iniciar-tunel.ps1` quando necessário.
 
-Campos vazios significam **Todos**.
-
-O importador:
-1. lê os ZIPs localmente;
-2. filtra antes de gravar;
-3. grava empresas e estabelecimentos selecionados;
-4. cria prospects;
-5. traz Simples/MEI;
-6. traz sócios;
-7. registra a importação;
-8. permite retomada por checkpoint.
+Nunca publique arquivos `.env` reais ou senhas no repositório/site. Os arquivos `.env.example` são apenas modelos.

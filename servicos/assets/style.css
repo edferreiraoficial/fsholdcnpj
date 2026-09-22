@@ -1,0 +1,86 @@
+:root{--navy:#062c61;--blue:#0b4f93;--yellow:#f6ad16;--ink:#142033;--muted:#606b79;--bg:#f4f6f8;--white:#fff;--green:#159447}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:var(--ink);line-height:1.55;background:#fff}a{text-decoration:none;color:inherit}.wrap{width:min(1160px,92%);margin:auto}.top{background:#fff;position:sticky;top:0;z-index:50;box-shadow:0 2px 12px #00000012}.nav{height:82px;display:flex;align-items:center;justify-content:space-between;gap:25px}.brand-logo img{height:66px;width:auto;display:block}.links{display:flex;gap:25px;align-items:center;font-size:14px;font-weight:700}.cta,.btn{display:inline-flex;align-items:center;justify-content:center;border-radius:5px;padding:14px 20px;font-weight:900;border:0}.cta,.btn.primary{background:var(--yellow);color:#142033}.btn.whatsapp{background:var(--green);color:#fff}.btn.light{background:#fff;color:var(--navy)}.photo-hero{min-height:600px;position:relative;display:flex;align-items:center;color:#fff;background:url('images/eletrica-bancada.jpg') center/cover no-repeat}.photo-overlay{position:absolute;inset:0;background:linear-gradient(90deg,#041b3be8 0%,#06356dc9 42%,#062c6150 70%,#0000 100%)}.hero-content{position:relative;padding:80px 0;z-index:1}.hero-content h1{font-size:clamp(42px,5.4vw,70px);line-height:1.02;max-width:760px;margin:12px 0 20px;text-transform:uppercase}.hero-content p{font-size:21px;max-width:660px;color:#edf5ff}.eyebrow,.section-tag{font-size:12px;letter-spacing:2px;font-weight:900;color:var(--yellow)}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}.hero-points{display:flex;gap:24px;flex-wrap:wrap;margin-top:28px;font-weight:700}.quick{background:var(--yellow);padding:22px 0}.quick-grid{display:flex;justify-content:space-between;align-items:center;gap:20px}.quick-grid div{display:flex;flex-direction:column}.quick-grid strong{font-size:22px}.section{padding:82px 0}.center{text-align:center}.section h2{font-size:clamp(32px,4vw,48px);line-height:1.1;margin:9px 0 14px}.lead{color:var(--muted);font-size:18px}.center-lead{margin:0 auto 40px;max-width:760px}.service-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:24px;text-align:left}.service-card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 10px 35px #09284d18;border:1px solid #e8edf2;transition:.2s}.service-card:hover{transform:translateY(-4px);box-shadow:0 14px 40px #09284d28}.service-card img{width:100%;height:300px;object-fit:cover;display:block}.service-copy{padding:24px}.service-copy span{font-size:12px;font-weight:900;letter-spacing:1.4px;color:var(--blue)}.service-copy h3{font-size:27px;margin:5px 0 8px}.service-copy p{color:var(--muted);margin:0 0 14px}.service-copy b{color:var(--blue)}.dark{background:#052b5b;color:#fff}.dark p{color:#dbe8f7}.gold{color:#ffc64b}.work-head{display:flex;justify-content:space-between;align-items:end;gap:25px;margin-bottom:30px}.gallery{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:230px;gap:12px}.gallery img{width:100%;height:100%;object-fit:cover;border-radius:6px}.gallery .wide{grid-column:span 2;grid-row:span 2}.split{display:grid;grid-template-columns:1fr 1fr;gap:55px;align-items:center}.checks{display:grid;gap:12px;margin:25px 0}.check{background:var(--bg);border-left:4px solid var(--yellow);padding:14px 16px}.big{margin-top:5px}.promo-img{width:100%;border-radius:10px;box-shadow:0 18px 50px #0002}.footer{background:#031c3d;color:#dbe6f3;padding:45px 0 90px}.footer-grid{display:flex;justify-content:space-between;gap:30px}.footer-logo{height:90px;background:#fff;border-radius:5px}.copyright{border-top:1px solid #ffffff22;margin-top:28px;padding-top:20px;font-size:13px}.floating{position:fixed;right:20px;bottom:20px;background:var(--green);color:#fff;border-radius:999px;padding:15px 20px;font-weight:900;box-shadow:0 8px 28px #0005;z-index:60}@media(max-width:850px){.links a:not(.cta){display:none}.service-cards,.split{grid-template-columns:1fr}.gallery{grid-template-columns:1fr 1fr}.work-head{align-items:start;flex-direction:column}.photo-hero{min-height:540px}.photo-overlay{background:#04295cd9}.promo-img{order:-1}.brand-logo img{height:55px}}@media(max-width:560px){.nav{height:70px}.brand-logo img{height:48px}.cta{font-size:11px;padding:11px}.hero-content h1{font-size:39px}.hero-content p{font-size:18px}.quick-grid,.footer-grid{flex-direction:column;align-items:flex-start}.service-card img{height:220px}.gallery{grid-template-columns:1fr;grid-auto-rows:220px}.gallery .wide{grid-column:auto;grid-row:auto}.section{padding:58px 0}.floating{left:14px;right:14px;text-align:center}.footer-logo{height:75px}}
+
+.details-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:34px;text-align:left}.detail-panel{background:#fff;border:1px solid #e5ebf2;border-radius:10px;padding:28px;box-shadow:0 10px 30px #09284d12}.detail-panel h3{font-size:24px;margin:0 0 14px;color:var(--navy)}.detail-panel ul{margin:0;padding-left:20px;color:var(--muted)}.detail-panel li{margin:9px 0}.contact-footer{display:grid;grid-template-columns:1.1fr 1fr 1.5fr;gap:35px;align-items:start}.contact-footer h3{color:#fff;margin:0 0 10px}.contact-footer p{margin:6px 0}.contact-footer a{color:#fff}.footer-cta{font-size:18px;font-weight:800}.footer-address{font-style:normal}.footer-name{font-weight:800;color:#fff}@media(max-width:850px){.details-grid,.contact-footer{grid-template-columns:1fr}}
+
+
+/* V4 - Melhorias de legibilidade e acessibilidade */
+body{font-size:18px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+.nav{height:98px}
+.brand-logo img{height:82px}
+.links{font-size:16px;font-weight:800}
+.cta,.btn{font-size:16px;line-height:1.25}
+.hero-content p{font-size:24px;line-height:1.55;font-weight:500}
+.hero-break{display:inline-block;margin-top:3px}
+.eyebrow,.section-tag{font-size:14px;line-height:1.4}
+.hero-points{font-size:18px}
+.quick-grid strong{font-size:25px}.quick-grid span{font-size:18px}
+.lead{font-size:21px;line-height:1.65;color:#4b5665}
+.service-copy span{font-size:14px}
+.service-copy h3{font-size:30px}
+.service-copy p{font-size:18px;line-height:1.65;color:#4b5665}
+.service-copy b{font-size:18px}
+.detail-panel h3{font-size:27px}
+.detail-panel ul{font-size:18px;line-height:1.6;color:#4b5665}
+.check{font-size:18px;line-height:1.55}
+.contact-footer{font-size:17px;line-height:1.65}
+.contact-footer h3{font-size:20px;line-height:1.35}
+.footer-cta{font-size:21px}
+.footer-name,.footer-address{font-size:18px}
+.footer-logo{height:112px}
+.copyright{font-size:15px}
+.floating{font-size:16px}
+.service-hero p{font-size:23px!important;line-height:1.6}
+.service-list div{font-size:18px;line-height:1.45}
+@media(max-width:850px){.nav{height:88px}.brand-logo img{height:70px}.links .cta{font-size:14px}.hero-content p{font-size:21px}.footer-logo{height:100px}}
+@media(max-width:560px){body{font-size:17px}.nav{height:80px}.brand-logo img{height:62px}.cta{font-size:13px;padding:12px 14px}.hero-content p{font-size:20px;line-height:1.55}.lead{font-size:19px}.service-copy p,.detail-panel ul,.check{font-size:17px}.footer-logo{height:90px}.footer-cta{font-size:19px}.footer-name,.footer-address{font-size:17px}}
+
+
+/* V5 - rodape, ancoras e alinhamentos */
+html{scroll-padding-top:118px}
+#servicos,#trabalhos,#atendimento{scroll-margin-top:118px}
+.contact-footer{grid-template-columns:180px 250px minmax(0,1fr);column-gap:52px;align-items:start}
+.contact-footer>div:nth-child(3){padding-left:28px}
+.footer-cta{white-space:nowrap}
+.footer-cta a{white-space:nowrap;display:inline-block}
+.footer-address{white-space:normal}
+@media(max-width:850px){html{scroll-padding-top:104px}#servicos,#trabalhos,#atendimento{scroll-margin-top:104px}.contact-footer{grid-template-columns:1fr;row-gap:28px}.contact-footer>div:nth-child(3){padding-left:0}.footer-cta,.footer-cta a{white-space:nowrap}}
+@media(max-width:560px){html{scroll-padding-top:94px}#servicos,#trabalhos,#atendimento{scroll-margin-top:94px}.footer-cta{font-size:17px}.contact-footer{font-size:16px}}
+
+/* V6: alinhamento definitivo do rodape e ancora com cabecalho sticky */
+.contact-footer{display:grid;grid-template-columns:170px 300px minmax(390px,1fr);gap:42px;align-items:start}
+.contact-footer>div:nth-child(2){min-width:300px}
+.contact-footer>div:nth-child(3){padding-left:0;min-width:0}
+.footer-cta{font-size:18px;white-space:nowrap;margin:6px 0}
+.footer-cta a{display:inline-block;white-space:nowrap}
+.footer-address{display:block;font-size:16px;line-height:1.6;white-space:nowrap}
+.contact-footer h3{font-size:18px}
+@media(max-width:1000px){.contact-footer{grid-template-columns:150px 280px 1fr;gap:28px}.footer-address{white-space:normal}}
+@media(max-width:850px){.contact-footer{grid-template-columns:1fr;row-gap:28px}.contact-footer>div:nth-child(2){min-width:0}.footer-address{white-space:normal}.footer-cta,.footer-cta a{white-space:nowrap}}
+
+/* O deslocamento das ancoras e controlado em JS para usar a altura real do cabecalho. */
+html{scroll-padding-top:0}
+#servicos,#trabalhos,#atendimento{scroll-margin-top:0}
+
+/* V7 - refinamento de alinhamento do rodape */
+@media (min-width:1001px){
+  .contact-footer{grid-template-columns:170px 330px minmax(430px,1fr);gap:42px}
+  .contact-footer>div:nth-child(2){text-align:center;justify-self:center;min-width:330px}
+  .contact-footer>div:nth-child(3){padding-left:52px;justify-self:stretch}
+  .footer-cta,.footer-name{text-align:center}
+}
+
+/* V8 - refinamento final do rodape */
+@media (min-width:1001px){
+  .contact-footer{grid-template-columns:170px 340px minmax(430px,1fr);gap:42px}
+  .contact-footer>div:nth-child(2){text-align:center;justify-self:center;min-width:340px}
+  .contact-footer>div:nth-child(2) p,
+  .contact-footer>div:nth-child(2) a,
+  .contact-footer>div:nth-child(2) strong,
+  .footer-cta,
+  .footer-name{font-size:18px;font-weight:800;line-height:1.55;font-family:Arial,Helvetica,sans-serif}
+  .contact-footer>div:nth-child(3){padding-left:105px;justify-self:stretch}
+}
+
+
+/* V9 - ajustes solicitados no rodape */
+.contact-footer>div:nth-child(2)>h3{font-size:18px;font-weight:800;line-height:1.55;font-family:Arial,Helvetica,sans-serif}
