@@ -15,3 +15,16 @@ document.querySelectorAll('a[href^="#"]').forEach(link => {
     if (history.replaceState) history.replaceState(null, '', selector);
   });
 });
+
+
+// GA4: registra contatos iniciados pelos links do WhatsApp.
+document.querySelectorAll('a[href*="wa.me/"], a[href*="whatsapp.com/"]').forEach(link => {
+  link.addEventListener('click', () => {
+    if (typeof window.gtag !== 'function') return;
+    window.gtag('event', 'whatsapp', {
+      link_url: link.href,
+      page_location: window.location.href,
+      page_title: document.title
+    });
+  });
+});
