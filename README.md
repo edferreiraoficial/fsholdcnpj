@@ -1,10 +1,11 @@
-# FS Hold — Serviços + CRM CNPJ
+# FS Hold — Serviços + Contabilidade + CRM CNPJ
 
 Projeto consolidado da FS Hold. O site público de serviços e o CRM são independentes para que uma publicação não quebre a outra.
 
 ## Estrutura ativa
 
 - `servicos/` — site público estático para `servicos.fshold.com.br`.
+- `contabilidade/` — site público estático para `contabilidade.fshold.com.br`.
 - `frontend/` — CRM React/Vite para `crm.fshold.com.br`.
 - `backend/` — API Fastify/Node para `api.fshold.com.br` (porta definida por `PORT`).
 - `database/` — migrations e ajustes do MariaDB.
@@ -33,6 +34,13 @@ npm run dev
 ```
 CRM local: `http://localhost:5173`
 
+### Site de contabilidade
+```powershell
+cd contabilidade
+python -m http.server 8081
+```
+Site local: `http://localhost:8081`
+
 ### Site de serviços
 ```powershell
 cd servicos
@@ -52,6 +60,7 @@ npm run build
 
 Publicação esperada:
 - conteúdo de `servicos/` -> `servicos.fshold.com.br`;
+- conteúdo de `contabilidade/` -> `contabilidade.fshold.com.br` (diretório público próprio do subdomínio);
 - conteúdo de `frontend/dist/` -> `crm.fshold.com.br`;
 - aplicação Node de `backend/` -> `api.fshold.com.br`.
 
