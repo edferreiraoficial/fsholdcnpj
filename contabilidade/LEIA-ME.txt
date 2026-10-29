@@ -1,0 +1,8 @@
+FS HOLD CONTABILIDADE — SITE INSTITUCIONAL
+
+1. Abra index.html no navegador para visualizar.
+2. Para publicar na Hostinger, envie index.html, styles.css, script.js e a pasta assets para a pasta pública do domínio/subdomínio.
+3. O WhatsApp está configurado para (19) 97134-5031.
+4. O formulário abre o WhatsApp, não envia nem armazena dados no servidor.
+5. Confirme as condições reais da oferta limitada antes de publicar e ajuste a redação se necessário.
+6. Este site não contém backend, banco de dados ou integração de analytics.
